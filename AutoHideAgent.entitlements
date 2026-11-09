@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      RECOMMENDED DEFAULT: Unsandboxed (com.apple.security.app-sandbox = false)
+      NSRunningApplication.hide() sends a cooperative IPC request via LaunchServices/WindowServer
+      and works out-of-the-box without Accessibility (TCC) prompts when unsandboxed.
+      
+      IF SANDBOXED (e.g., for Mac App Store distribution):
+      Set com.apple.security.app-sandbox = true and request a temporary exception or
+      Automation AppleEvents entitlement if controlling apps via AppleEvents.
+    -->
+    <key>com.apple.security.app-sandbox</key>
+    <false/>
+</dict>
+</plist>

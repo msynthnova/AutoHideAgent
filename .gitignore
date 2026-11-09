@@ -1,0 +1,16 @@
+# Swift Package Manager & Xcode build artifacts
+.build/
+.swiftpm/
+build/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+
+# macOS system files
+.DS_Store
+
+# Keep release zip inside dist/ tracked so GitHub repo includes the release artifact
+!dist/
+!dist/*.zip
+!dist/*.sha256
