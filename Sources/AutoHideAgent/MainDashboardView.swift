@@ -59,7 +59,16 @@ public struct MainDashboardView: View {
             manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
         }
         .onReceive(uiRefreshTimer) { _ in
+            guard selectedSection == .runningApps,
+                  NSApplication.shared.windows.contains(where: { $0.title == "AutoHide" && $0.isVisible }) else {
+                return
+            }
             manager.refreshRunningApps()
+        }
+        .onChange(of: selectedSection) { _, newSection in
+            if newSection == .runningApps {
+                manager.refreshRunningApps()
+            }
         }
     }
 

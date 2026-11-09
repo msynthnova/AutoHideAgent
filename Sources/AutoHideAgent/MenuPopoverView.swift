@@ -1,78 +1,139 @@
 import AppKit
-import Combine
 import SwiftUI
 
-/// Clean, quick-action Menu Bar Popover (`width: 320`).
-/// Designed specifically for fast menu-bar interactions without overflowing vertically or glitching.
+/// Native macOS Control Center ("Sound" menu style) floating panel view.
+/// - Zero background polling timers (event-driven via `@Observable` `AutoHideManager`).
+/// - Does NOT render 42 background apps every second; the Desktop App handles full app management.
+/// - Uses Apple Control Center's signature circular status badges, recessed expandable checkmark
+///   sections (`⌄`), full-width hover rows, and edge-to-edge hairline dividers.
 @MainActor
 public struct MenuPopoverView: View {
     @Bindable var manager: AutoHideManager
     public var onOpenMainWindow: (() -> Void)?
+    public var onClosePanel: (() -> Void)?
+    public var onLayoutChange: (() -> Void)?
 
-    private let uiRefreshTimer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
+    @State private var expandedSection: ExpandableMenuSection? = nil
+    @State private var hoveredRowID: String? = nil
 
-    public init(manager: AutoHideManager, onOpenMainWindow: (() -> Void)? = nil) {
+    private enum ExpandableMenuSection: Equatable {
+        case autoHide
+        case autoQuit
+    }
+
+    public init(
+        manager: AutoHideManager,
+        onOpenMainWindow: (() -> Void)? = nil,
+        onClosePanel: (() -> Void)? = nil,
+        onLayoutChange: (() -> Void)? = nil
+    ) {
         self.manager = manager
         self.onOpenMainWindow = onOpenMainWindow
+        self.onClosePanel = onClosePanel
+        self.onLayoutChange = onLayoutChange
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            headerSection
+        VStack(alignment: .leading, spacing: 0) {
+            // 1. Header ("AutoHide" + Master Switch)
+            headerBar
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+                .padding(.bottom, 10)
 
-            if !manager.isAccessibilityTrusted {
-                accessibilityBanner
+            hairlineDivider
+
+            // 2. Automation Modes (Control Center Circular Icon Rows + Expandable Sub-Menus)
+            sectionHeader("Automation")
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+            autoHideControlCenterRow
+            if expandedSection == .autoHide {
+                autoHideExpandedSubmenu
             }
 
-            quickActionsRow
+            autoQuitControlCenterRow
+            if expandedSection == .autoQuit {
+                autoQuitExpandedSubmenu
+            }
 
-            Divider()
+            snoozeControlCenterRow
+                .padding(.bottom, 6)
 
-            timersQuickControlSection
+            hairlineDivider
 
-            Divider()
+            // 3. Quick Actions
+            sectionHeader("Quick Actions")
+                .padding(.top, 8)
+                .padding(.bottom, 4)
 
-            runningAppsMiniSection
+            hideNowActionRow
 
-            Divider()
+            if !manager.isAccessibilityTrusted {
+                accessibilityActionRow
+            }
 
-            footerSection
+            Spacer().frame(height: 6)
+
+            hairlineDivider
+
+            // 4. Footer Menu Links (Matches "Sound Settings..." in macOS Control Center)
+            VStack(alignment: .leading, spacing: 2) {
+                footerMenuLinkRow(
+                    id: "footer.openWindow",
+                    title: "AutoHide Settings…",
+                    shortcutHint: "⌘0"
+                ) {
+                    onClosePanel?()
+                    onOpenMainWindow?()
+                }
+
+                footerMenuLinkRow(
+                    id: "footer.openLog",
+                    title: "Open Diagnostic Log…"
+                ) {
+                    onClosePanel?()
+                    manager.openDiagnosticLogFile()
+                }
+
+                footerMenuLinkRow(
+                    id: "footer.quit",
+                    title: "Quit AutoHide",
+                    shortcutHint: "⌘Q"
+                ) {
+                    NSApplication.shared.terminate(nil)
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 6)
         }
-        .padding(14)
-        .frame(width: 320)
+        .frame(width: 308)
+        .onChange(of: expandedSection) { _, _ in
+            DispatchQueue.main.async {
+                onLayoutChange?()
+            }
+        }
         .onAppear {
-            manager.refreshRunningApps()
-            manager.refreshLaunchAtLoginStatus()
             manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
-        }
-        .onReceive(uiRefreshTimer) { _ in
-            manager.refreshRunningApps()
         }
     }
 
-    // MARK: - 1. Header
+    // MARK: - 1. Control Center Header
 
-    private var headerSection: some View {
+    private var headerBar: some View {
         HStack(spacing: 10) {
-            if let appIcon = NSApplication.shared.applicationIconImage {
-                Image(nsImage: appIcon)
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: 34, height: 34)
-                    .opacity(manager.isEnabled && !manager.isTemporarilyPaused ? 1.0 : 0.55)
-            }
-
             VStack(alignment: .leading, spacing: 2) {
                 Text("AutoHide")
-                    .font(.system(size: 13.5, weight: .bold))
+                    .font(.system(size: 13.5, weight: .semibold))
                     .foregroundStyle(.primary)
 
                 HStack(spacing: 5) {
                     Circle()
                         .fill(statusDotColor)
-                        .frame(width: 7, height: 7)
+                        .frame(width: 6.5, height: 6.5)
                     Text(statusSubtitle)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 11, weight: .regular))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -81,321 +142,423 @@ public struct MenuPopoverView: View {
 
             Toggle("", isOn: $manager.isEnabled)
                 .toggleStyle(.switch)
-                .labelsHidden()
                 .controlSize(.small)
+                .labelsHidden()
         }
     }
 
     private var statusDotColor: Color {
-        guard manager.isEnabled else { return Color.secondary.opacity(0.5) }
+        guard manager.isEnabled else { return Color.secondary.opacity(0.45) }
         return manager.isTemporarilyPaused ? .orange : .green
     }
 
     private var statusSubtitle: String {
-        guard manager.isEnabled else { return "Disabled" }
+        guard manager.isEnabled else { return "Off" }
         if let until = manager.pausedUntilDate, Date.now < until {
             let remaining = manager.formatFriendlyDuration(until.timeIntervalSinceNow)
-            return "Snoozed (\(remaining) left)"
+            return "Paused (\(remaining) left)"
         }
-        return "Active — Watching Apps"
+        return "Active"
     }
 
-    // MARK: - 2. Accessibility Banner (Only if needed)
+    // MARK: - 2. Expandable Control Center Rows (Like AirPods Pro -> Listening Mode)
 
-    private var accessibilityBanner: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-                .font(.system(size: 13))
+    private var autoHideControlCenterRow: some View {
+        let isActive = manager.isEnabled && manager.isAutoHideEnabled
+        let currentLabel = TimeoutPreset(rawValue: manager.timeoutSeconds)?.label ?? "\(manager.timeoutSeconds / 60)m"
+        let isExpanded = (expandedSection == .autoHide)
 
-            Text("Accessibility needed to hide apps")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.primary)
-
-            Spacer()
-
-            Button("Grant") {
-                manager.refreshAccessibilityTrustStatus(promptIfNeeded: true)
+        return controlCenterItemRow(
+            id: "row.autoHide",
+            icon: "eye.slash.fill",
+            isActive: isActive,
+            activeTint: .accentColor,
+            title: "Auto-Hide Apps",
+            subtitle: isActive ? "After \(currentLabel) of inactivity" : "Off",
+            showsChevron: true,
+            isExpanded: isExpanded,
+            onIconTap: {
+                if !manager.isEnabled { manager.isEnabled = true }
+                manager.isAutoHideEnabled.toggle()
+            },
+            onRowTap: {
+                withAnimation(.snappy(duration: 0.18)) {
+                    expandedSection = isExpanded ? nil : .autoHide
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
-            .controlSize(.mini)
-        }
-        .padding(8)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.orange.opacity(0.14))
         )
     }
 
-    // MARK: - 3. Quick Actions
+    private var autoHideExpandedSubmenu: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text("Hide Inactive Apps After")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
 
-    private var quickActionsRow: some View {
-        HStack(spacing: 8) {
-            Button {
-                manager.hideAllBackgroundAppsNow()
-            } label: {
-                Label("Hide Others Now", systemImage: "eye.slash.fill")
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .frame(maxWidth: .infinity)
+            ForEach(TimeoutPreset.allCases) { preset in
+                let isSelected = manager.isAutoHideEnabled && (manager.timeoutSeconds == preset.rawValue)
+                submenuCheckmarkRow(
+                    id: "autohide.\(preset.rawValue)",
+                    title: preset.descriptiveLabel,
+                    icon: "timer",
+                    isSelected: isSelected
+                ) {
+                    manager.isEnabled = true
+                    manager.isAutoHideEnabled = true
+                    manager.timeoutSeconds = preset.rawValue
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
 
-            Button {
+            submenuCheckmarkRow(
+                id: "autohide.off",
+                title: "Off",
+                icon: "eye",
+                isSelected: !manager.isAutoHideEnabled
+            ) {
+                manager.isAutoHideEnabled = false
+            }
+            .padding(.bottom, 6)
+        }
+        .background(Color.primary.opacity(0.055))
+        .overlay(alignment: .top) { hairlineDivider }
+        .overlay(alignment: .bottom) { hairlineDivider }
+    }
+
+    private var autoQuitControlCenterRow: some View {
+        let isActive = manager.isEnabled && manager.isAutoQuitEnabled
+        let currentLabel = QuitTimeoutPreset(rawValue: manager.quitTimeoutSeconds)?.label ?? "\(manager.quitTimeoutSeconds / 3600)h"
+        let isExpanded = (expandedSection == .autoQuit)
+
+        return controlCenterItemRow(
+            id: "row.autoQuit",
+            icon: "power",
+            isActive: isActive,
+            activeTint: .accentColor,
+            title: "Auto-Quit Hidden Apps",
+            subtitle: isActive
+                ? "After \(currentLabel) • \(manager.confirmBeforeAutoQuit ? "Ask first" : "Automatic")"
+                : "Off",
+            showsChevron: true,
+            isExpanded: isExpanded,
+            onIconTap: {
+                if !manager.isEnabled { manager.isEnabled = true }
+                manager.isAutoQuitEnabled.toggle()
+            },
+            onRowTap: {
+                withAnimation(.snappy(duration: 0.18)) {
+                    expandedSection = isExpanded ? nil : .autoQuit
+                }
+            }
+        )
+    }
+
+    private var autoQuitExpandedSubmenu: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text("Quit Hidden Apps After")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+            ForEach(QuitTimeoutPreset.allCases) { preset in
+                let isSelected = manager.isAutoQuitEnabled && (manager.quitTimeoutSeconds == preset.rawValue)
+                submenuCheckmarkRow(
+                    id: "autoquit.\(preset.rawValue)",
+                    title: preset.descriptiveLabel,
+                    icon: "clock.badge.xmark",
+                    isSelected: isSelected
+                ) {
+                    manager.isEnabled = true
+                    manager.isAutoQuitEnabled = true
+                    manager.quitTimeoutSeconds = preset.rawValue
+                }
+            }
+
+            submenuCheckmarkRow(
+                id: "autoquit.off",
+                title: "Off",
+                icon: "xmark.circle",
+                isSelected: !manager.isAutoQuitEnabled
+            ) {
+                manager.isAutoQuitEnabled = false
+            }
+
+            hairlineDivider
+                .padding(.vertical, 4)
+
+            submenuCheckmarkRow(
+                id: "autoquit.confirm",
+                title: "Ask Confirmation Before Quitting",
+                icon: "checkmark.shield",
+                isSelected: manager.confirmBeforeAutoQuit
+            ) {
+                manager.confirmBeforeAutoQuit.toggle()
+            }
+            .padding(.bottom, 6)
+        }
+        .background(Color.primary.opacity(0.055))
+        .overlay(alignment: .top) { hairlineDivider }
+        .overlay(alignment: .bottom) { hairlineDivider }
+    }
+
+    private var snoozeControlCenterRow: some View {
+        let isSnoozed = manager.isTemporarilyPaused
+        return controlCenterItemRow(
+            id: "row.snooze",
+            icon: "cup.and.saucer.fill",
+            isActive: isSnoozed,
+            activeTint: .orange,
+            title: isSnoozed ? "Snoozed for 1 Hour" : "Pause for 1 Hour",
+            subtitle: isSnoozed ? "Tap to resume timers now" : "Temporarily freeze all timers",
+            showsChevron: false,
+            isExpanded: false,
+            onIconTap: {
                 manager.togglePauseForOneHour()
-            } label: {
-                Label(
-                    manager.isTemporarilyPaused ? "Resume" : "Pause 1h",
-                    systemImage: manager.isTemporarilyPaused ? "play.fill" : "cup.and.saucer.fill"
-                )
-                .font(.system(size: 11.5, weight: .medium))
-                .frame(maxWidth: .infinity)
+            },
+            onRowTap: {
+                manager.togglePauseForOneHour()
             }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
-            .disabled(!manager.isEnabled)
+        )
+    }
+
+    // MARK: - 3. Quick Actions Rows
+
+    private var hideNowActionRow: some View {
+        controlCenterItemRow(
+            id: "row.hideNow",
+            icon: "sparkles.rectangle.stack.fill",
+            isActive: false,
+            activeTint: .accentColor,
+            title: "Hide Background Apps Now",
+            subtitle: "Keep only frontmost app visible",
+            showsChevron: false,
+            isExpanded: false,
+            onIconTap: {
+                manager.hideAllBackgroundAppsNow()
+                onClosePanel?()
+            },
+            onRowTap: {
+                manager.hideAllBackgroundAppsNow()
+                onClosePanel?()
+            }
+        )
+    }
+
+    private var accessibilityActionRow: some View {
+        controlCenterItemRow(
+            id: "row.accessibility",
+            icon: "exclamationmark.triangle.fill",
+            isActive: true,
+            activeTint: .orange,
+            title: "Grant Accessibility Access…",
+            subtitle: "Required so macOS allows hiding apps",
+            showsChevron: false,
+            isExpanded: false,
+            onIconTap: {
+                onClosePanel?()
+                manager.refreshAccessibilityTrustStatus(promptIfNeeded: true)
+            },
+            onRowTap: {
+                onClosePanel?()
+                manager.refreshAccessibilityTrustStatus(promptIfNeeded: true)
+            }
+        )
+    }
+
+    // MARK: - Shared Control Center Components
+
+    private func sectionHeader(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+    }
+
+    private var hairlineDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.11))
+            .frame(height: 0.75)
+            .padding(.horizontal, 12)
+    }
+
+    @ViewBuilder
+    private func controlCenterItemRow(
+        id: String,
+        icon: String,
+        isActive: Bool,
+        activeTint: Color,
+        title: String,
+        subtitle: String,
+        showsChevron: Bool,
+        isExpanded: Bool,
+        onIconTap: @escaping () -> Void,
+        onRowTap: @escaping () -> Void
+    ) -> some View {
+        let isHovered = (hoveredRowID == id)
+
+        HStack(spacing: 10) {
+            // Circular Status Badge (tappable directly to toggle on/off like Wi-Fi / Bluetooth / AirPods)
+            Button(action: onIconTap) {
+                ZStack {
+                    Circle()
+                        .fill(isActive ? activeTint : Color.primary.opacity(0.11))
+                        .frame(width: 28, height: 28)
+
+                    Image(systemName: icon)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(isActive ? Color.white : Color.primary.opacity(0.85))
+                }
+            }
+            .buttonStyle(.plain)
+
+            // Main Row Area (toggles action or expands submenu)
+            Button(action: onRowTap) {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 1.5) {
+                        Text(title)
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+
+                        Text(subtitle)
+                            .font(.system(size: 10.5, weight: .regular))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 4)
+
+                    if showsChevron {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5.5)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
+        )
+        .padding(.horizontal, 6)
+        .onHover { hovering in
+            hoveredRowID = hovering ? id : (hoveredRowID == id ? nil : hoveredRowID)
         }
     }
 
-    // MARK: - 4. Compact Timers Control
+    @ViewBuilder
+    private func submenuCheckmarkRow(
+        id: String,
+        title: String,
+        icon: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        let isHovered = (hoveredRowID == id)
 
-    private var timersQuickControlSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Auto-Hide Row
-            VStack(alignment: .leading, spacing: 5) {
-                HStack {
-                    Label("Auto-Hide After", systemImage: "timer")
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundStyle(manager.isAutoHideEnabled ? .primary : .secondary)
-                    Spacer()
-                    Toggle("", isOn: $manager.isAutoHideEnabled)
-                        .toggleStyle(.switch)
-                        .controlSize(.mini)
-                        .labelsHidden()
-                        .disabled(!manager.isEnabled)
-                }
+        Button(action: action) {
+            HStack(spacing: 9) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .opacity(isSelected ? 1.0 : 0.0)
+                    .frame(width: 14, alignment: .center)
 
-                Picker("", selection: $manager.timeoutSeconds) {
-                    ForEach(TimeoutPreset.allCases) { preset in
-                        Text(preset.label).tag(preset.rawValue)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .controlSize(.small)
-                .labelsHidden()
-                .disabled(!manager.isEnabled || !manager.isAutoHideEnabled)
-            }
-
-            // Auto-Quit Row
-            VStack(alignment: .leading, spacing: 5) {
-                HStack {
-                    Label("Auto-Quit After", systemImage: "xmark.octagon.fill")
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundStyle(manager.isAutoQuitEnabled ? .primary : .secondary)
-                    Spacer()
-                    Toggle("", isOn: $manager.isAutoQuitEnabled)
-                        .toggleStyle(.switch)
-                        .controlSize(.mini)
-                        .labelsHidden()
-                        .disabled(!manager.isEnabled)
-                }
-
-                Picker("", selection: $manager.quitTimeoutSeconds) {
-                    ForEach(QuitTimeoutPreset.allCases) { preset in
-                        Text(preset.label).tag(preset.rawValue)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .controlSize(.small)
-                .labelsHidden()
-                .disabled(!manager.isEnabled || !manager.isAutoQuitEnabled)
-            }
-        }
-    }
-
-    // MARK: - 5. Compact Running Apps List
-
-    private var runningAppsMiniSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Background Apps (\(manager.runningRegularApps.count))")
-                    .font(.system(size: 11, weight: .semibold))
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
+                    .frame(width: 16, alignment: .center)
+
+                Text(title)
+                    .font(.system(size: 12, weight: isSelected ? .medium : .regular))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(isHovered ? Color.primary.opacity(0.09) : Color.clear)
+            )
+            .padding(.horizontal, 6)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            hoveredRowID = hovering ? id : (hoveredRowID == id ? nil : hoveredRowID)
+        }
+    }
+
+    @ViewBuilder
+    private func footerMenuLinkRow(
+        id: String,
+        title: String,
+        shortcutHint: String? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        let isHovered = (hoveredRowID == id)
+
+        Button(action: action) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 12.5, weight: .regular))
+                    .foregroundStyle(.primary)
 
                 Spacer()
 
-                if let latestLog = manager.activityLogs.first {
-                    Text(latestLog.userFriendlyMessage)
-                        .font(.system(size: 10))
+                if let shortcutHint {
+                    Text(shortcutHint)
+                        .font(.system(size: 11, weight: .regular))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .frame(maxWidth: 155, alignment: .trailing)
                 }
             }
-
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 4) {
-                    if manager.runningRegularApps.isEmpty {
-                        Text("No background apps open.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 24)
-                    } else {
-                        ForEach(manager.runningRegularApps) { app in
-                            miniAppRow(for: app)
-                        }
-                    }
-                }
-                .padding(6)
-            }
-            .frame(height: 150)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5.5)
+            .contentShape(Rectangle())
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(isHovered ? Color.primary.opacity(0.09) : Color.clear)
             )
         }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            hoveredRowID = hovering ? id : (hoveredRowID == id ? nil : hoveredRowID)
+        }
     }
+}
 
-    private func miniAppRow(for app: RunningAppInfo) -> some View {
-        let isWhitelisted = manager.whitelistedBundleIDs.contains {
-            $0.caseInsensitiveCompare(app.bundleIdentifier) == .orderedSame ||
-            $0.caseInsensitiveCompare(app.localizedName) == .orderedSame
+// MARK: - Descriptive Labels for Control Center Sub-Menus
+
+extension TimeoutPreset {
+    fileprivate var descriptiveLabel: String {
+        switch self {
+        case .fiveMinutes: return "5 Minutes"
+        case .tenMinutes: return "10 Minutes"
+        case .fifteenMinutes: return "15 Minutes"
+        case .thirtyMinutes: return "30 Minutes"
+        case .oneHour: return "1 Hour"
         }
-
-        return HStack(spacing: 7) {
-            if let icon = app.icon {
-                Image(nsImage: icon)
-                    .resizable()
-                    .frame(width: 18, height: 18)
-            } else {
-                Image(systemName: "app.fill")
-                    .font(.system(size: 13))
-                    .frame(width: 18, height: 18)
-            }
-
-            Text(app.localizedName)
-                .font(.system(size: 11.5, weight: .medium))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-
-            Spacer(minLength: 4)
-
-            Text(isWhitelisted ? "Excluded" : countdownLabel(for: app))
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                .foregroundStyle(isWhitelisted ? .secondary : (app.isHidden ? .secondary : .primary))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Capsule().fill(Color.primary.opacity(0.07)))
-
-            Button {
-                if isWhitelisted {
-                    manager.removeWhitelistEntry(app.bundleIdentifier)
-                } else {
-                    manager.addWhitelistEntry(app.bundleIdentifier)
-                }
-            } label: {
-                Image(systemName: isWhitelisted ? "shield.slash.fill" : "shield")
-                    .font(.system(size: 11))
-                    .foregroundStyle(isWhitelisted ? Color.accentColor : .secondary)
-            }
-            .buttonStyle(.plain)
-            .help(isWhitelisted ? "Remove from Exclusions" : "Exclude \(app.localizedName)")
-
-            if !app.isHidden {
-                Button {
-                    manager.manuallyHideApp(app)
-                } label: {
-                    Image(systemName: "eye.slash")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Hide \(app.localizedName) now")
-            }
-
-            Button {
-                manager.manuallyQuitApp(app)
-            } label: {
-                Image(systemName: "xmark.octagon.fill")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.red.opacity(0.85))
-            }
-            .buttonStyle(.plain)
-            .help("Quit \(app.localizedName) now")
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color.primary.opacity(0.03))
-        )
     }
+}
 
-    private func countdownLabel(for app: RunningAppInfo) -> String {
-        if app.hasActivePowerAssertion {
-            return "Media/Call"
-        }
-        if app.isProtectedMostRecent {
-            return "Recent"
-        }
-        guard let elapsed = app.elapsedInactiveSeconds else {
-            return "Active"
-        }
-        if app.isHidden {
-            if manager.isAutoQuitEnabled {
-                let remQuit = max(0, TimeInterval(manager.quitTimeoutSeconds) - elapsed)
-                return remQuit > 0 ? "Q: \(manager.formatFriendlyDuration(remQuit))" : "Hidden"
-            }
-            return "Hidden"
-        }
-        if !manager.isAutoHideEnabled {
-            return "Visible"
-        }
-        let remHide = max(0, TimeInterval(manager.timeoutSeconds) - elapsed)
-        return remHide > 0 ? manager.formatFriendlyDuration(remHide) : "Soon"
-    }
-
-    // MARK: - 6. Footer
-
-    private var footerSection: some View {
-        HStack(spacing: 8) {
-            if let onOpenMainWindow {
-                Button {
-                    onOpenMainWindow()
-                } label: {
-                    Label("Open Full App", systemImage: "macwindow")
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-            }
-
-            Button {
-                manager.openDiagnosticLogFile()
-            } label: {
-                Image(systemName: "doc.text.magnifyingglass")
-                    .font(.system(size: 11.5))
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .help("Open Diagnostic Log File")
-
-            Button(role: .destructive) {
-                NSApplication.shared.terminate(nil)
-            } label: {
-                Label("Quit", systemImage: "power")
-                    .font(.system(size: 11.5, weight: .medium))
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+extension QuitTimeoutPreset {
+    fileprivate var descriptiveLabel: String {
+        switch self {
+        case .oneHour: return "1 Hour"
+        case .twoHours: return "2 Hours"
+        case .sixHours: return "6 Hours"
+        case .twelveHours: return "12 Hours"
+        case .oneDay: return "24 Hours (1 Day)"
         }
     }
 }

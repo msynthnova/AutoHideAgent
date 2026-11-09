@@ -1,6 +1,15 @@
 import AppKit
 import SwiftUI
 
+/// Borderless, non-activating Control Center floating panel (like macOS Sound / Wi-Fi menu panels).
+/// Appears immediately below the menu bar icon with a 14pt continuous corner radius, native `.menu`
+/// blur material, and zero triangle arrow (`▲`), without stealing focus from the active application.
+@MainActor
+private final class ControlCenterMenuPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
 @main
 @MainActor
 public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
@@ -9,8 +18,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     private var mainWindow: NSWindow?
     private var statusItem: NSStatusItem?
-    private let popover = NSPopover()
+    private var menuPanel: ControlCenterMenuPanel?
+    private var menuHostingView: NSHostingView<MenuPopoverView>?
     private var globalClickMonitor: Any?
+    private var localKeyMonitor: Any?
     private let autoHideManager = AutoHideManager()
 
     // MARK: - Entry Point
@@ -26,7 +37,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         setupMainMenuBar()
-        setupPopover()
+        setupControlCenterMenuPanel()
         applyAppearanceModes(initialLaunch: true)
         setupAndShowMainWindow()
 
@@ -85,7 +96,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             }
             updateStatusItemAppearance()
         } else {
-            closePopover()
+            closeMenuPanel()
             if let existingItem = statusItem {
                 NSStatusBar.system.removeStatusItem(existingItem)
                 statusItem = nil
@@ -97,7 +108,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     private func setupAndShowMainWindow() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 860, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 820, height: 580),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -120,7 +131,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     }
 
     public func showMainWindow() {
-        closePopover()
+        closeMenuPanel()
         guard let window = mainWindow else {
             setupAndShowMainWindow()
             return
@@ -194,21 +205,63 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         autoHideManager.openDiagnosticLogFile()
     }
 
-    // MARK: - Setup Menu Bar Status Item & Popover
+    // MARK: - Setup Control Center Floating Menu Panel (No Triangle Beak)
 
-    private func setupPopover() {
-        popover.behavior = .transient
-        popover.animates = true
-        let hostingController = NSHostingController(
-            rootView: MenuPopoverView(
-                manager: autoHideManager,
-                onOpenMainWindow: { [weak self] in
-                    self?.showMainWindow()
-                }
-            )
+    private func setupControlCenterMenuPanel() {
+        let panel = ControlCenterMenuPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 308, height: 320),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: true
         )
-        hostingController.sizingOptions = [.preferredContentSize]
-        popover.contentViewController = hostingController
+        panel.level = .popUpMenu
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.isMovable = false
+        panel.hidesOnDeactivate = false
+
+        // Frosted Control Center .menu visual effect surface with 14pt continuous corner radius
+        let visualEffect = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 308, height: 320))
+        visualEffect.material = .menu
+        visualEffect.blendingMode = .behindWindow
+        visualEffect.state = .active
+        visualEffect.wantsLayer = true
+        visualEffect.layer?.cornerRadius = 14
+        visualEffect.layer?.cornerCurve = .continuous
+        visualEffect.layer?.masksToBounds = true
+        visualEffect.layer?.borderWidth = 0.85
+        visualEffect.layer?.borderColor = NSColor.white.withAlphaComponent(0.18).cgColor
+
+        let rootView = MenuPopoverView(
+            manager: autoHideManager,
+            onOpenMainWindow: { [weak self] in
+                self?.showMainWindow()
+            },
+            onClosePanel: { [weak self] in
+                self?.closeMenuPanel()
+            },
+            onLayoutChange: { [weak self] in
+                self?.repositionAndResizeMenuPanel(animated: true)
+            }
+        )
+
+        let hostingView = NSHostingView(rootView: rootView)
+        hostingView.sizingOptions = []
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        visualEffect.addSubview(hostingView)
+
+        NSLayoutConstraint.activate([
+            hostingView.leadingAnchor.constraint(equalTo: visualEffect.leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor),
+            hostingView.topAnchor.constraint(equalTo: visualEffect.topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor)
+        ])
+
+        panel.contentView = visualEffect
+        self.menuPanel = panel
+        self.menuHostingView = hostingView
     }
 
     private func updateStatusItemAppearance() {
@@ -282,40 +335,100 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             return
         }
 
-        if popover.isShown {
-            closePopover()
+        if menuPanel?.isVisible == true {
+            closeMenuPanel()
         } else {
-            openPopover(relativeTo: sender)
+            openMenuPanel(relativeTo: sender)
         }
     }
 
-    private func openPopover(relativeTo sender: NSStatusBarButton) {
-        autoHideManager.refreshRunningApps()
-        autoHideManager.refreshLaunchAtLoginStatus()
+    private func openMenuPanel(relativeTo sender: NSStatusBarButton) {
+        if menuPanel == nil {
+            setupControlCenterMenuPanel()
+        }
+        guard let panel = menuPanel else { return }
 
-        // Activate application before showing popover so clicking menus/pickers inside the popover
-        // works reliably when running as a .regular Dock app without immediately dismissing.
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.makeKey()
+        // Highlight status bar button while panel is open, matching Apple Control Center
+        sender.highlight(true)
 
-        // Install a global mouse-down monitor so clicking anywhere outside cleanly dismisses the popover
+        repositionAndResizeMenuPanel(animated: false)
+        panel.alphaValue = 0.0
+        panel.makeKeyAndOrderFront(nil)
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.11
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().alphaValue = 1.0
+        }
+
+        // Dismiss cleanly when clicking anywhere outside the panel
         if globalClickMonitor == nil {
             globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
                 MainActor.assumeIsolated {
-                    self?.closePopover()
+                    self?.closeMenuPanel()
                 }
+            }
+        }
+
+        // Dismiss on Escape key
+        if localKeyMonitor == nil {
+            localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                if event.keyCode == 53 { // Escape
+                    MainActor.assumeIsolated {
+                        self?.closeMenuPanel()
+                    }
+                    return nil
+                }
+                return event
             }
         }
     }
 
-    private func closePopover() {
-        if popover.isShown {
-            popover.performClose(nil)
+    private func repositionAndResizeMenuPanel(animated: Bool) {
+        guard let panel = menuPanel,
+              let hostingView = menuHostingView,
+              let sender = statusItem?.button,
+              let buttonWindow = sender.window else { return }
+
+        hostingView.layoutSubtreeIfNeeded()
+        let fittingSize = hostingView.fittingSize
+        let panelWidth: CGFloat = 308
+        let panelHeight: CGFloat = max(210, fittingSize.height)
+
+        let buttonFrameInWindow = sender.convert(sender.bounds, to: nil)
+        let buttonFrameOnScreen = buttonWindow.convertToScreen(buttonFrameInWindow)
+        let screenFrame = buttonWindow.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+
+        var originX = round(buttonFrameOnScreen.midX - (panelWidth / 2.0))
+        if screenFrame != .zero {
+            originX = max(screenFrame.minX + 8, min(originX, screenFrame.maxX - panelWidth - 8))
+        }
+        let originY = round(buttonFrameOnScreen.minY - panelHeight - 5)
+        let targetFrame = NSRect(x: originX, y: originY, width: panelWidth, height: panelHeight)
+
+        if animated && panel.isVisible {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.16
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                panel.animator().setFrame(targetFrame, display: true)
+            }
+        } else {
+            panel.setFrame(targetFrame, display: true)
+        }
+    }
+
+    private func closeMenuPanel() {
+        statusItem?.button?.highlight(false)
+        if let panel = menuPanel, panel.isVisible {
+            panel.orderOut(nil)
         }
         if let monitor = globalClickMonitor {
             NSEvent.removeMonitor(monitor)
             globalClickMonitor = nil
+        }
+        if let keyMonitor = localKeyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+            localKeyMonitor = nil
         }
     }
 }
