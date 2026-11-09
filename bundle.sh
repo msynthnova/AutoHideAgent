@@ -83,32 +83,40 @@ if [[ "$MODE" == "release" ]]; then
     echo "==> Release ZIP SHA256: $SHA256_VAL"
 
     # Sparkle sign & generate appcast.xml
-    if [[ -x "$PROJECT_DIR/tools/sparkle/bin/sign_update" ]]; then
+    SPARKLE_BIN="$PROJECT_DIR/tools/sparkle/bin"
+    if [[ ! -x "$SPARKLE_BIN/sign_update" ]]; then
+        echo "==> Fetching Sparkle CLI release tools on demand..."
+        mkdir -p "$PROJECT_DIR/tools/sparkle"
+        curl -L -s https://github.com/sparkle-project/Sparkle/releases/download/2.10.1/Sparkle-2.10.1.tar.xz | tar -xJf - -C "$PROJECT_DIR/tools/sparkle" ./bin
+    fi
+
+    if [[ -x "$SPARKLE_BIN/sign_update" ]]; then
         echo "==> Generating Sparkle EdDSA signature..."
         if [[ -f "$PROJECT_DIR/.sparkle_priv.key" ]]; then
-            SIGN_SIG=$("$PROJECT_DIR/tools/sparkle/bin/sign_update" --ed-key-file "$PROJECT_DIR/.sparkle_priv.key" -p "$ZIP_PATH")
+            SIGN_SIG=$("$SPARKLE_BIN/sign_update" --ed-key-file "$PROJECT_DIR/.sparkle_priv.key" -p "$ZIP_PATH")
         else
-            SIGN_SIG=$("$PROJECT_DIR/tools/sparkle/bin/sign_update" --account AutoHideAgent -p "$ZIP_PATH")
+            SIGN_SIG=$("$SPARKLE_BIN/sign_update" --account AutoHideAgent -p "$ZIP_PATH")
         fi
         echo "    EdDSA Signature: $SIGN_SIG"
 
         echo "==> Generating appcast.xml..."
         if [[ -f "$PROJECT_DIR/.sparkle_priv.key" ]]; then
-            "$PROJECT_DIR/tools/sparkle/bin/generate_appcast" \
+            "$SPARKLE_BIN/generate_appcast" \
                 --download-url-prefix "https://github.com/msynthnova/AutoHideAgent/releases/download/v${APP_VERSION}/" \
                 --ed-key-file "$PROJECT_DIR/.sparkle_priv.key" \
                 "$DIST_DIR"
         else
-            "$PROJECT_DIR/tools/sparkle/bin/generate_appcast" \
+            "$SPARKLE_BIN/generate_appcast" \
                 --download-url-prefix "https://github.com/msynthnova/AutoHideAgent/releases/download/v${APP_VERSION}/" \
                 --account AutoHideAgent \
                 "$DIST_DIR"
         fi
 
-        # Sync appcast.xml to repo root for raw GitHub URL access
+        # Sync appcast.xml to repo root for raw GitHub URL access and clean dist/
         if [[ -f "$DIST_DIR/appcast.xml" ]]; then
             cp "$DIST_DIR/appcast.xml" "$PROJECT_DIR/appcast.xml"
-            echo "==> appcast.xml synced to project root."
+            rm -f "$DIST_DIR/appcast.xml"
+            echo "==> appcast.xml updated at project root."
         fi
     fi
 

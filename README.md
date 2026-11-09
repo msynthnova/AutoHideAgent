@@ -102,8 +102,7 @@ AutoHideAgent/
 ├── bundle.sh                                 # Build, package, Sparkle sign & Homebrew sync script
 ├── dist/
 │   ├── AutoHideAgent-macOS-v1.0.0.zip        # Signed Release .app archive
-│   ├── AutoHideAgent-macOS-v1.0.0.zip.sha256 # SHA-256 checksum
-│   └── appcast.xml                           # Dist appcast feed
+│   └── AutoHideAgent-macOS-v1.0.0.zip.sha256 # SHA-256 checksum
 ├── README.md                                 # Comprehensive documentation
 ├── Sources/
 │   └── AutoHideAgent/
@@ -134,7 +133,4 @@ swift test
 
 # 3. Build a Debug .app bundle and launch it
 ./bundle.sh debug && open ./build/AutoHideAgent.app
-
-# 4. Regenerate AppIcon.icns from vector CoreGraphics script (optional)
-swift generate_icon.swift && iconutil -c icns build/AppIcon.iconset -o AppIcon.icns
 ```
