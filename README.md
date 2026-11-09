@@ -12,12 +12,8 @@ AutoHideAgent supports two native update distribution channels: **Homebrew Cask*
 
 Install directly via the custom tap:
 ```bash
-# Add the tap and install AutoHideAgent
-brew tap msynthnova/tap
-brew install --cask autohideagent
-
-# Or single-command install:
-brew install --cask msynthnova/tap/autohideagent
+# Add the tap and install AutoHideAgent (bypass Gatekeeper quarantine automatically)
+brew install --cask --no-quarantine msynthnova/tap/autohideagent
 
 # Update anytime via Homebrew:
 brew upgrade --cask autohideagent
@@ -41,7 +37,10 @@ brew upgrade --cask autohideagent
 
 1. Extract `dist/AutoHideAgent-macOS-v1.0.0.zip`.
 2. Move `AutoHideAgent.app` to `/Applications`.
-3. Open `AutoHideAgent.app` and grant Accessibility permissions when prompted.
+3. If macOS blocks opening on first launch ("Apple could not verify AutoHideAgent is free of malware"):
+   - Click **Done**, open **System Settings → Privacy & Security**, scroll to **Security**, and click **Open Anyway**.
+   - Or run in Terminal: `xattr -cr /Applications/AutoHideAgent.app`
+4. Grant Accessibility permissions when prompted on first run.
 
 ---
 
