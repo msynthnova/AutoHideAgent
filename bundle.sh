@@ -30,6 +30,10 @@ rm -rf "$APP_BUNDLE"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$FRAMEWORKS_DIR"
 
 cp "$EXECUTABLE" "$MACOS_DIR/AutoHideAgent"
+if [[ "$MODE" == "release" ]]; then
+    echo "==> Stripping local debug symbols & paths from binary..."
+    strip -x "$MACOS_DIR/AutoHideAgent"
+fi
 if [[ -f "$PROJECT_DIR/AppIcon.icns" ]]; then
     cp "$PROJECT_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 fi

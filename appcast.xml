@@ -4,12 +4,12 @@
         <title>AutoHideAgent</title>
         <item>
             <title>1.0.0</title>
-            <pubDate>Mon, 09 Nov 2026 04:11:54 -0600</pubDate>
+            <pubDate>Mon, 09 Nov 2026 04:13:35 -0600</pubDate>
             <sparkle:version>2</sparkle:version>
             <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.0.0/AutoHideAgent-macOS-v1.0.0.zip" length="1773358" type="application/octet-stream" sparkle:edSignature="IbLLsJU5XMArjnJL2DUIoEpUGF96NZwfL7A5mWjwWqZOnn8q3BWjPJdClkE2M89C4NBXs1M0btW0qi1yIXCIBA=="/>
+            <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.0.0/AutoHideAgent-macOS-v1.0.0.zip" length="1611692" type="application/octet-stream" sparkle:edSignature="bVP0jDquk8j5Npkc6RnEgAeZDKPCl/g27OO9knCAbIOXruRrtkgmhCU93VswBIoFx61IXpfsYHem7882rrpBAw=="/>
         </item>
     </channel>
 </rss>
