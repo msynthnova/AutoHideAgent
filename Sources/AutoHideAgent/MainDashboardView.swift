@@ -33,7 +33,7 @@ public struct MainDashboardView: View {
         }
     }
 
-    private let uiRefreshTimer = Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()
+    private let uiRefreshTimer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
 
     public init(manager: AutoHideManager) {
         self.manager = manager
@@ -137,7 +137,7 @@ public struct MainDashboardView: View {
                 return
             }
             manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
-            if selectedSection == .runningApps || selectedSection == .overview {
+            if selectedSection == .runningApps {
                 manager.refreshRunningApps()
             }
         }
@@ -146,6 +146,7 @@ public struct MainDashboardView: View {
                 for: NSNotification.Name("com.example.AutoHideAgent.debugSelectSection")
             )
         ) { notification in
+            guard autoHideDebugHooksEnabled else { return }
             if let raw = notification.object as? String,
                let section = NavigationSection(rawValue: raw) {
                 selectedSection = section

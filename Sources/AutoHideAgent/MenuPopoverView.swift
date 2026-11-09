@@ -175,6 +175,7 @@ public struct MenuPopoverView: View {
                 for: NSNotification.Name("com.example.AutoHideAgent.debugSetExpandedSection")
             )
         ) { notification in
+            guard autoHideDebugHooksEnabled else { return }
             if let mode = notification.object as? String {
                 switch mode {
                 case "autoHide": expandedSection = .autoHide

@@ -91,6 +91,9 @@ public struct RunningAppInfo: Identifiable, Hashable, Sendable {
     public var id: String { bundleIdentifier }
 }
 
+/// Debug automation hooks (snapshots, tab switching) are only active when launched with AUTOHIDE_DEBUG=1.
+public let autoHideDebugHooksEnabled = ProcessInfo.processInfo.environment["AUTOHIDE_DEBUG"] != nil
+
 // MARK: - AutoHideManager (AutoHideController)
 
 /// Coordinates event-driven application transition tracking, HID idle guards,
@@ -443,6 +446,7 @@ public final class AutoHideManager {
         refreshAccessibilityTrustStatus(promptIfNeeded: false)
         let frontmostApp = NSWorkspace.shared.frontmostApplication
         let myPID = ProcessInfo.processInfo.processIdentifier
+        let protectedAssertions = protectActiveMediaApps ? activePowerAssertionPIDs() : []
         var hiddenCount = 0
         var eligibleCount = 0
         var blockedByAX = false
@@ -459,6 +463,9 @@ public final class AutoHideManager {
                 continue
             }
 
+            if keepPreviousAppVisible, pid == mostRecentBackgroundPID { continue }
+            if protectActiveMediaApps, protectedAssertions.contains(pid) { continue }
+
             eligibleCount += 1
 
             if app.hide() {
@@ -474,14 +481,6 @@ public final class AutoHideManager {
                     break
                 }
             }
-        }
-
-        // If the user clicked "Hide Other Apps" while inside AutoHideAgent itself and Accessibility wasn't granted yet,
-        // use AppKit's native hideOtherApplications so it still works immediately.
-        if hiddenCount == 0 && eligibleCount > 0 && NSApplication.shared.isActive {
-            NSApplication.shared.hideOtherApplications(nil)
-            hiddenCount = eligibleCount
-            blockedByAX = false
         }
 
         if hiddenCount > 0 {
@@ -651,6 +650,12 @@ public final class AutoHideManager {
     private func writeToPersistentLogFile(_ line: String) {
         let url = logFileURL
         guard let data = line.data(using: .utf8) else { return }
+        // Rotate at 1 MB so the diagnostic log never grows without bound
+        if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int, size > 1_000_000 {
+            let old = url.deletingPathExtension().appendingPathExtension("old.log")
+            try? FileManager.default.removeItem(at: old)
+            try? FileManager.default.moveItem(at: url, to: old)
+        }
         if FileManager.default.fileExists(atPath: url.path) {
             if let handle = try? FileHandle(forWritingTo: url) {
                 defer { try? handle.close() }

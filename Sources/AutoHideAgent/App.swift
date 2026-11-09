@@ -62,7 +62,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             self?.applyAppearanceModes(initialLaunch: false)
         }
 
-        // Allow automated UI verification to toggle/open the menu bar panel and export a visual snapshot
+        // Allow automated UI verification (only when launched with AUTOHIDE_DEBUG=1)
+        if autoHideDebugHooksEnabled { installDebugHooks() }
+    }
+
+    private func installDebugHooks() {
         DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name("com.example.AutoHideAgent.debugOpenMenuPanel"),
             object: nil,
