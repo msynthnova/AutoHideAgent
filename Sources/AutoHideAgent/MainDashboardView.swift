@@ -535,7 +535,7 @@ public struct MainDashboardView: View {
                         // Manual Check Button + Version & Status
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Current Version: v1.0.0 (Build 2)")
+                                Text("Current Version: \(currentAppVersionDisplay)")
                                     .font(.system(size: 13, weight: .medium))
                                 Text("Last checked: \(updateController.friendlyLastCheckDate)")
                                     .font(.system(size: 11.5))
@@ -609,6 +609,12 @@ public struct MainDashboardView: View {
             return "Timers paused for \(manager.formatFriendlyDuration(until.timeIntervalSinceNow))."
         }
         return "Watching \(manager.runningRegularApps.count) open apps (\(manager.visibleBackgroundAppsCount) visible, \(manager.hiddenBackgroundAppsCount) hidden)."
+    }
+
+    private var currentAppVersionDisplay: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+        return "v\(version) (Build \(build))"
     }
 
     private var accessibilityStatusGroup: some View {
