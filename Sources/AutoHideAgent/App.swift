@@ -10,6 +10,14 @@ private final class ControlCenterMenuPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+/// Custom `NSHostingView` that accepts the first mouse click immediately even when the app is not active.
+@MainActor
+private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+}
+
 @main
 @MainActor
 public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
@@ -19,8 +27,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private var mainWindow: NSWindow?
     private var statusItem: NSStatusItem?
     private var menuPanel: ControlCenterMenuPanel?
-    private var menuHostingView: NSHostingView<MenuPopoverView>?
+    private var menuHostingView: FirstMouseHostingView<MenuPopoverView>?
+    private var currentMeasuredPanelHeight: CGFloat = 417
+    private var lastPanelCloseUptime: TimeInterval = 0
     private var globalClickMonitor: Any?
+    private var localClickMonitor: Any?
     private var localKeyMonitor: Any?
     private let autoHideManager = AutoHideManager()
 
@@ -47,6 +58,41 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
         autoHideManager.onAppearanceModeChange = { [weak self] in
             self?.applyAppearanceModes(initialLaunch: false)
+        }
+
+        // Allow automated UI verification to toggle/open the menu bar panel and export a visual snapshot
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.example.AutoHideAgent.debugOpenMenuPanel"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let snapshotPath = notification.object as? String
+            MainActor.assumeIsolated {
+                guard let self, let button = self.statusItem?.button else { return }
+                self.openMenuPanel(relativeTo: button)
+                let isKey = self.menuPanel?.isKeyWindow ?? false
+                let isVis = self.menuPanel?.isVisible ?? false
+                let frameStr = NSStringFromRect(self.menuPanel?.frame ?? .zero)
+                let appActive = NSApplication.shared.isActive
+                self.autoHideManager.appendLog(
+                    .info,
+                    "Menu panel opened (diagnostic check).",
+                    technical: "isKey=\(isKey), isVisible=\(isVis), appActive=\(appActive), frame=\(frameStr)"
+                )
+                if let snapshotPath,
+                   let hostingView = self.menuHostingView {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        hostingView.layoutSubtreeIfNeeded()
+                        let bounds = hostingView.bounds
+                        if let rep = hostingView.bitmapImageRepForCachingDisplay(in: bounds) {
+                            hostingView.cacheDisplay(in: bounds, to: rep)
+                            if let pngData = rep.representation(using: .png, properties: [:]) {
+                                try? pngData.write(to: URL(fileURLWithPath: snapshotPath))
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -90,7 +136,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
                 if let button = item.button {
                     button.target = self
                     button.action = #selector(handleStatusItemClick(_:))
-                    button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+                    button.sendAction(on: [.leftMouseDown, .rightMouseDown])
                 }
                 statusItem = item
             }
@@ -108,7 +154,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     private func setupAndShowMainWindow() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 820, height: 580),
+            contentRect: NSRect(x: 0, y: 0, width: 840, height: 580),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -121,7 +167,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.center()
-        window.setFrameAutosaveName("AutoHideMainWindow")
         window.contentViewController = NSHostingController(
             rootView: MainDashboardView(manager: autoHideManager)
         )
@@ -209,10 +254,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     private func setupControlCenterMenuPanel() {
         let panel = ControlCenterMenuPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 308, height: 320),
+            contentRect: NSRect(x: 0, y: 0, width: 312, height: 342),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
-            defer: true
+            defer: false
         )
         panel.level = .popUpMenu
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
@@ -221,18 +266,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         panel.hasShadow = true
         panel.isMovable = false
         panel.hidesOnDeactivate = false
-
-        // Frosted Control Center .menu visual effect surface with 14pt continuous corner radius
-        let visualEffect = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 308, height: 320))
-        visualEffect.material = .menu
-        visualEffect.blendingMode = .behindWindow
-        visualEffect.state = .active
-        visualEffect.wantsLayer = true
-        visualEffect.layer?.cornerRadius = 14
-        visualEffect.layer?.cornerCurve = .continuous
-        visualEffect.layer?.masksToBounds = true
-        visualEffect.layer?.borderWidth = 0.85
-        visualEffect.layer?.borderColor = NSColor.white.withAlphaComponent(0.18).cgColor
+        panel.becomesKeyOnlyIfNeeded = false
 
         let rootView = MenuPopoverView(
             manager: autoHideManager,
@@ -242,24 +276,21 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             onClosePanel: { [weak self] in
                 self?.closeMenuPanel()
             },
-            onLayoutChange: { [weak self] in
-                self?.repositionAndResizeMenuPanel(animated: true)
+            onHeightChange: { [weak self] measuredHeight in
+                guard let self else { return }
+                let roundedHeight = ceil(measuredHeight)
+                if abs(roundedHeight - self.currentMeasuredPanelHeight) > 0.5 {
+                    self.currentMeasuredPanelHeight = roundedHeight
+                    self.repositionAndResizeMenuPanel(animated: false)
+                }
             }
         )
 
-        let hostingView = NSHostingView(rootView: rootView)
-        hostingView.sizingOptions = []
-        hostingView.translatesAutoresizingMaskIntoConstraints = false
-        visualEffect.addSubview(hostingView)
+        let hostingView = FirstMouseHostingView(rootView: rootView)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 312, height: 342)
+        hostingView.autoresizingMask = [.width, .height]
 
-        NSLayoutConstraint.activate([
-            hostingView.leadingAnchor.constraint(equalTo: visualEffect.leadingAnchor),
-            hostingView.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor),
-            hostingView.topAnchor.constraint(equalTo: visualEffect.topAnchor),
-            hostingView.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor)
-        ])
-
-        panel.contentView = visualEffect
+        panel.contentView = hostingView
         self.menuPanel = panel
         self.menuHostingView = hostingView
     }
@@ -330,43 +361,61 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     @objc private func handleStatusItemClick(_ sender: NSStatusBarButton) {
         let currentEvent = NSApp.currentEvent
         // Right-clicking (or Control-clicking) the menu bar icon immediately hides all background apps!
-        if currentEvent?.type == .rightMouseUp || (currentEvent?.modifierFlags.contains(.control) == true) {
+        if currentEvent?.type == .rightMouseDown || currentEvent?.type == .rightMouseUp || (currentEvent?.modifierFlags.contains(.control) == true) {
+            closeMenuPanel()
             autoHideManager.hideAllBackgroundAppsNow()
             return
         }
 
         if menuPanel?.isVisible == true {
             closeMenuPanel()
-        } else {
-            openMenuPanel(relativeTo: sender)
+            return
         }
+
+        // Guard against mouseDown on status item closing via monitor and immediately re-opening
+        if ProcessInfo.processInfo.systemUptime - lastPanelCloseUptime < 0.2 {
+            return
+        }
+
+        openMenuPanel(relativeTo: sender)
     }
 
     private func openMenuPanel(relativeTo sender: NSStatusBarButton) {
         if menuPanel == nil {
             setupControlCenterMenuPanel()
         }
-        guard let panel = menuPanel else { return }
+        guard let panel = menuPanel, let hostingView = menuHostingView else { return }
 
-        // Highlight status bar button while panel is open, matching Apple Control Center
-        sender.highlight(true)
-
-        repositionAndResizeMenuPanel(animated: false)
-        panel.alphaValue = 0.0
-        panel.makeKeyAndOrderFront(nil)
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.11
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().alphaValue = 1.0
+        hostingView.layoutSubtreeIfNeeded()
+        let fittingHeight = ceil(hostingView.fittingSize.height)
+        if fittingHeight > 100 {
+            currentMeasuredPanelHeight = fittingHeight
         }
 
-        // Dismiss cleanly when clicking anywhere outside the panel
+        repositionAndResizeMenuPanel(animated: false)
+        panel.alphaValue = 1.0
+        panel.makeKeyAndOrderFront(nil)
+
+        // Dismiss cleanly when clicking outside the panel in another app
         if globalClickMonitor == nil {
             globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
                 MainActor.assumeIsolated {
                     self?.closeMenuPanel()
                 }
+            }
+        }
+
+        // Dismiss cleanly when clicking on our own main desktop window outside the menu panel
+        if localClickMonitor == nil {
+            localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+                MainActor.assumeIsolated {
+                    guard let self, let panel = self.menuPanel, panel.isVisible else { return }
+                    let statusWindow = self.statusItem?.button?.window
+                    if event.window !== panel && event.window !== statusWindow {
+                        self.closeMenuPanel()
+                    }
+                }
+                return event
             }
         }
 
@@ -386,14 +435,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     private func repositionAndResizeMenuPanel(animated: Bool) {
         guard let panel = menuPanel,
-              let hostingView = menuHostingView,
               let sender = statusItem?.button,
               let buttonWindow = sender.window else { return }
 
-        hostingView.layoutSubtreeIfNeeded()
-        let fittingSize = hostingView.fittingSize
-        let panelWidth: CGFloat = 308
-        let panelHeight: CGFloat = max(210, fittingSize.height)
+        let panelWidth: CGFloat = 312
+        let panelHeight: CGFloat = max(260, currentMeasuredPanelHeight)
 
         let buttonFrameInWindow = sender.convert(sender.bounds, to: nil)
         let buttonFrameOnScreen = buttonWindow.convertToScreen(buttonFrameInWindow)
@@ -408,7 +454,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
         if animated && panel.isVisible {
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.16
+                context.duration = 0.14
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 panel.animator().setFrame(targetFrame, display: true)
             }
@@ -418,13 +464,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     }
 
     private func closeMenuPanel() {
-        statusItem?.button?.highlight(false)
         if let panel = menuPanel, panel.isVisible {
+            lastPanelCloseUptime = ProcessInfo.processInfo.systemUptime
             panel.orderOut(nil)
         }
         if let monitor = globalClickMonitor {
             NSEvent.removeMonitor(monitor)
             globalClickMonitor = nil
+        }
+        if let localMonitor = localClickMonitor {
+            NSEvent.removeMonitor(localMonitor)
+            localClickMonitor = nil
         }
         if let keyMonitor = localKeyMonitor {
             NSEvent.removeMonitor(keyMonitor)

@@ -1,17 +1,35 @@
 import AppKit
 import SwiftUI
 
+/// Native AppKit `NSVisualEffectView` wrapper for authentic macOS Control Center `.menu` translucency.
+private struct ControlCenterVisualEffectBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .menu
+        view.blendingMode = .behindWindow
+        view.state = .active
+        view.isEmphasized = true
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = .menu
+        nsView.blendingMode = .behindWindow
+        nsView.state = .active
+        nsView.isEmphasized = true
+    }
+}
+
 /// Native macOS Control Center ("Sound" menu style) floating panel view.
 /// - Zero background polling timers (event-driven via `@Observable` `AutoHideManager`).
-/// - Does NOT render 42 background apps every second; the Desktop App handles full app management.
-/// - Uses Apple Control Center's signature circular status badges, recessed expandable checkmark
-///   sections (`⌄`), full-width hover rows, and edge-to-edge hairline dividers.
+/// - Reports its exact measured height via `.onGeometryChange` so the floating `NSPanel`
+///   never clips or miscalculates height when opening or expanding sub-sections.
 @MainActor
 public struct MenuPopoverView: View {
     @Bindable var manager: AutoHideManager
     public var onOpenMainWindow: (() -> Void)?
     public var onClosePanel: (() -> Void)?
-    public var onLayoutChange: (() -> Void)?
+    public var onHeightChange: ((CGFloat) -> Void)?
 
     @State private var expandedSection: ExpandableMenuSection? = nil
     @State private var hoveredRowID: String? = nil
@@ -25,12 +43,12 @@ public struct MenuPopoverView: View {
         manager: AutoHideManager,
         onOpenMainWindow: (() -> Void)? = nil,
         onClosePanel: (() -> Void)? = nil,
-        onLayoutChange: (() -> Void)? = nil
+        onHeightChange: ((CGFloat) -> Void)? = nil
     ) {
         self.manager = manager
         self.onOpenMainWindow = onOpenMainWindow
         self.onClosePanel = onClosePanel
-        self.onLayoutChange = onLayoutChange
+        self.onHeightChange = onHeightChange
     }
 
     public var body: some View {
@@ -108,14 +126,36 @@ public struct MenuPopoverView: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 6)
         }
-        .frame(width: 308)
-        .onChange(of: expandedSection) { _, _ in
-            DispatchQueue.main.async {
-                onLayoutChange?()
+        .frame(width: 312)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(ControlCenterVisualEffectBackground())
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.85)
+        )
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.height
+        } action: { newHeight in
+            if newHeight > 50 {
+                onHeightChange?(newHeight)
             }
         }
         .onAppear {
             manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+        }
+        .onReceive(
+            DistributedNotificationCenter.default().publisher(
+                for: NSNotification.Name("com.example.AutoHideAgent.debugSetExpandedSection")
+            )
+        ) { notification in
+            if let mode = notification.object as? String {
+                switch mode {
+                case "autoHide": expandedSection = .autoHide
+                case "autoQuit": expandedSection = .autoQuit
+                default: expandedSection = nil
+                }
+            }
         }
     }
 
@@ -182,9 +222,7 @@ public struct MenuPopoverView: View {
                 manager.isAutoHideEnabled.toggle()
             },
             onRowTap: {
-                withAnimation(.snappy(duration: 0.18)) {
-                    expandedSection = isExpanded ? nil : .autoHide
-                }
+                expandedSection = isExpanded ? nil : .autoHide
             }
         )
     }
@@ -222,7 +260,7 @@ public struct MenuPopoverView: View {
             }
             .padding(.bottom, 6)
         }
-        .background(Color.primary.opacity(0.055))
+        .background(Color.primary.opacity(0.06))
         .overlay(alignment: .top) { hairlineDivider }
         .overlay(alignment: .bottom) { hairlineDivider }
     }
@@ -248,9 +286,7 @@ public struct MenuPopoverView: View {
                 manager.isAutoQuitEnabled.toggle()
             },
             onRowTap: {
-                withAnimation(.snappy(duration: 0.18)) {
-                    expandedSection = isExpanded ? nil : .autoQuit
-                }
+                expandedSection = isExpanded ? nil : .autoQuit
             }
         )
     }
@@ -300,7 +336,7 @@ public struct MenuPopoverView: View {
             }
             .padding(.bottom, 6)
         }
-        .background(Color.primary.opacity(0.055))
+        .background(Color.primary.opacity(0.06))
         .overlay(alignment: .top) { hairlineDivider }
         .overlay(alignment: .bottom) { hairlineDivider }
     }
@@ -313,7 +349,7 @@ public struct MenuPopoverView: View {
             isActive: isSnoozed,
             activeTint: .orange,
             title: isSnoozed ? "Snoozed for 1 Hour" : "Pause for 1 Hour",
-            subtitle: isSnoozed ? "Tap to resume timers now" : "Temporarily freeze all timers",
+            subtitle: isSnoozed ? "Click to resume timers now" : "Temporarily freeze all timers",
             showsChevron: false,
             isExpanded: false,
             onIconTap: {
