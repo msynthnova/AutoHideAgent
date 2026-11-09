@@ -1,16 +1,17 @@
 import AppKit
 import SwiftUI
 
-/// Borderless, non-activating Control Center floating panel (like macOS Sound / Wi-Fi menu panels).
-/// Appears immediately below the menu bar icon with a 14pt continuous corner radius, native `.menu`
-/// blur material, and zero triangle arrow (`▲`), without stealing focus from the active application.
+/// Native Control Center floating panel (like macOS Sound / Wi-Fi menu panels).
+/// Uses `[.titled, .fullSizeContentView, .nonactivatingPanel]` with hidden titlebar buttons so
+/// macOS WindowServer itself applies the hardware corner mask, native hairline rim border, and shadow.
 @MainActor
 private final class ControlCenterMenuPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 }
 
-/// Custom `NSHostingView` that accepts the first mouse click immediately even when the app is not active.
+/// Custom `NSHostingView` that accepts the first mouse click immediately even when the app is not active,
+/// and removes the default safe-area titlebar inset so content fills edge-to-edge.
 @MainActor
 private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
@@ -28,10 +29,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private var statusItem: NSStatusItem?
     private var menuPanel: ControlCenterMenuPanel?
     private var menuHostingView: FirstMouseHostingView<MenuPopoverView>?
-    private var currentMeasuredPanelHeight: CGFloat = 417
+    private var currentMeasuredPanelHeight: CGFloat = 356
     private var lastPanelCloseUptime: TimeInterval = 0
     private var globalClickMonitor: Any?
     private var localClickMonitor: Any?
+    private var localMouseUpMonitor: Any?
     private var localKeyMonitor: Any?
     private let autoHideManager = AutoHideManager()
 
@@ -250,15 +252,20 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         autoHideManager.openDiagnosticLogFile()
     }
 
-    // MARK: - Setup Control Center Floating Menu Panel (No Triangle Beak)
+    // MARK: - Setup Control Center Floating Menu Panel (Native WindowServer Rim & Corner Mask)
 
     private func setupControlCenterMenuPanel() {
         let panel = ControlCenterMenuPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 312, height: 342),
-            styleMask: [.borderless, .nonactivatingPanel],
+            contentRect: NSRect(x: 0, y: 0, width: 308, height: 356),
+            styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.standardWindowButton(.closeButton)?.isHidden = true
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.level = .popUpMenu
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         panel.isOpaque = false
@@ -287,7 +294,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         )
 
         let hostingView = FirstMouseHostingView(rootView: rootView)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 312, height: 342)
+        hostingView.safeAreaRegions = []
+        hostingView.frame = NSRect(x: 0, y: 0, width: 308, height: 356)
         hostingView.autoresizingMask = [.width, .height]
 
         panel.contentView = hostingView
@@ -310,6 +318,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
         button.image = makeMenuBarIcon(isEnabled: active)
         button.toolTip = description
+        let isPanelOpen = (menuPanel?.isVisible == true)
+        setStatusButtonHighlighted(isPanelOpen)
+    }
+
+    private func setStatusButtonHighlighted(_ highlighted: Bool) {
+        guard let button = statusItem?.button else { return }
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 5.5
+        button.layer?.cornerCurve = .continuous
+        button.layer?.backgroundColor = highlighted
+            ? NSColor.labelColor.withAlphaComponent(0.18).cgColor
+            : NSColor.clear.cgColor
+        button.highlight(highlighted)
     }
 
     /// Draws a custom, pixel-aligned 18x18 macOS menu bar template icon (front window + receding dashed window).
@@ -384,7 +405,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         if menuPanel == nil {
             setupControlCenterMenuPanel()
         }
-        guard let panel = menuPanel, let hostingView = menuHostingView else { return }
+        guard let panel = menuPanel, let hostingView = panel.contentView else { return }
 
         hostingView.layoutSubtreeIfNeeded()
         let fittingHeight = ceil(hostingView.fittingSize.height)
@@ -395,6 +416,29 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         repositionAndResizeMenuPanel(animated: false)
         panel.alphaValue = 1.0
         panel.makeKeyAndOrderFront(nil)
+
+        // Keep the menu bar icon background pill highlighted while the panel is open
+        setStatusButtonHighlighted(true)
+        DispatchQueue.main.async { [weak self] in
+            if self?.menuPanel?.isVisible == true {
+                self?.setStatusButtonHighlighted(true)
+            }
+        }
+
+        // Re-assert status bar button highlight on mouseUp (since NSStatusBarButton clears highlight on mouseUp)
+        if localMouseUpMonitor == nil {
+            localMouseUpMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] event in
+                MainActor.assumeIsolated {
+                    guard let self, self.menuPanel?.isVisible == true else { return }
+                    DispatchQueue.main.async {
+                        if self.menuPanel?.isVisible == true {
+                            self.setStatusButtonHighlighted(true)
+                        }
+                    }
+                }
+                return event
+            }
+        }
 
         // Dismiss cleanly when clicking outside the panel in another app
         if globalClickMonitor == nil {
@@ -438,8 +482,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
               let sender = statusItem?.button,
               let buttonWindow = sender.window else { return }
 
-        let panelWidth: CGFloat = 312
-        let panelHeight: CGFloat = max(260, currentMeasuredPanelHeight)
+        let panelWidth: CGFloat = 308
+        let panelHeight: CGFloat = max(240, currentMeasuredPanelHeight)
 
         let buttonFrameInWindow = sender.convert(sender.bounds, to: nil)
         let buttonFrameOnScreen = buttonWindow.convertToScreen(buttonFrameInWindow)
@@ -464,6 +508,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     }
 
     private func closeMenuPanel() {
+        setStatusButtonHighlighted(false)
         if let panel = menuPanel, panel.isVisible {
             lastPanelCloseUptime = ProcessInfo.processInfo.systemUptime
             panel.orderOut(nil)
@@ -475,6 +520,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         if let localMonitor = localClickMonitor {
             NSEvent.removeMonitor(localMonitor)
             localClickMonitor = nil
+        }
+        if let mouseUpMonitor = localMouseUpMonitor {
+            NSEvent.removeMonitor(mouseUpMonitor)
+            localMouseUpMonitor = nil
         }
         if let keyMonitor = localKeyMonitor {
             NSEvent.removeMonitor(keyMonitor)

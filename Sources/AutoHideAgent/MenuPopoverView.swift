@@ -1,22 +1,23 @@
 import AppKit
 import SwiftUI
 
-/// Native AppKit `NSVisualEffectView` wrapper for authentic macOS Control Center `.menu` translucency.
+/// Native AppKit `NSVisualEffectView` wrapper configured to match Apple's macOS Control Center
+/// (`Sound` / `Wi-Fi` panel) translucency without bright background color bleed-through.
 private struct ControlCenterVisualEffectBackground: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
-        view.material = .menu
+        view.material = .popover
         view.blendingMode = .behindWindow
         view.state = .active
-        view.isEmphasized = true
+        view.isEmphasized = false
         return view
     }
 
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.material = .menu
+        nsView.material = .popover
         nsView.blendingMode = .behindWindow
         nsView.state = .active
-        nsView.isEmphasized = true
+        nsView.isEmphasized = false
     }
 }
 
@@ -81,18 +82,13 @@ public struct MenuPopoverView: View {
 
             hairlineDivider
 
-            // 3. Quick Actions
+            // 3. Quick Actions (Clean — no permission prompt clutter)
             sectionHeader("Quick Actions")
                 .padding(.top, 8)
                 .padding(.bottom, 4)
 
             hideNowActionRow
-
-            if !manager.isAccessibilityTrusted {
-                accessibilityActionRow
-            }
-
-            Spacer().frame(height: 6)
+                .padding(.bottom, 6)
 
             hairlineDivider
 
@@ -126,23 +122,23 @@ public struct MenuPopoverView: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 6)
         }
-        .frame(width: 312)
+        .frame(width: 308)
         .fixedSize(horizontal: false, vertical: true)
-        .background(ControlCenterVisualEffectBackground())
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.85)
+        .background(
+            ZStack {
+                ControlCenterVisualEffectBackground()
+                // Subtle neutral surface tint so saturated colors behind the window diffuse smoothly like Apple's Sound panel
+                Color(nsColor: .windowBackgroundColor)
+                    .opacity(0.32)
+            }
         )
+        .ignoresSafeArea()
         .onGeometryChange(for: CGFloat.self) { proxy in
             proxy.size.height
         } action: { newHeight in
             if newHeight > 50 {
                 onHeightChange?(newHeight)
             }
-        }
-        .onAppear {
-            manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
         }
         .onReceive(
             DistributedNotificationCenter.default().publisher(
@@ -361,7 +357,7 @@ public struct MenuPopoverView: View {
         )
     }
 
-    // MARK: - 3. Quick Actions Rows
+    // MARK: - 3. Quick Actions Row
 
     private var hideNowActionRow: some View {
         controlCenterItemRow(
@@ -380,27 +376,6 @@ public struct MenuPopoverView: View {
             onRowTap: {
                 manager.hideAllBackgroundAppsNow()
                 onClosePanel?()
-            }
-        )
-    }
-
-    private var accessibilityActionRow: some View {
-        controlCenterItemRow(
-            id: "row.accessibility",
-            icon: "exclamationmark.triangle.fill",
-            isActive: true,
-            activeTint: .orange,
-            title: "Grant Accessibility Access…",
-            subtitle: "Required so macOS allows hiding apps",
-            showsChevron: false,
-            isExpanded: false,
-            onIconTap: {
-                onClosePanel?()
-                manager.refreshAccessibilityTrustStatus(promptIfNeeded: true)
-            },
-            onRowTap: {
-                onClosePanel?()
-                manager.refreshAccessibilityTrustStatus(promptIfNeeded: true)
             }
         )
     }
@@ -482,8 +457,8 @@ public struct MenuPopoverView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5.5)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(isHovered ? Color.primary.opacity(0.085) : Color.clear)
         )
         .padding(.horizontal, 6)
         .onHover { hovering in
