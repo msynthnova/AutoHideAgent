@@ -7,13 +7,13 @@
 ## Download & Release Package
 
 A pre-built, signed Release `.app` archive is included directly in this repository:
-- **Release Archive:** [`dist/AutoHideAgent-macOS-v1.0.0.zip`](./dist/AutoHideAgent-macOS-v1.0.0.zip)
-- **SHA-256 Checksum:** [`dist/AutoHideAgent-macOS-v1.0.0.zip.sha256`](./dist/AutoHideAgent-macOS-v1.0.0.zip.sha256)
+- **Release Archive:** [`dist/AutoHide-macOS-v1.0.0.zip`](./dist/AutoHide-macOS-v1.0.0.zip)
+- **SHA-256 Checksum:** [`dist/AutoHide-macOS-v1.0.0.zip.sha256`](./dist/AutoHide-macOS-v1.0.0.zip.sha256)
 
 ### Quick Installation from ZIP
-1. Extract `dist/AutoHideAgent-macOS-v1.0.0.zip`.
-2. Drag `AutoHideAgent.app` into `/Applications`.
-3. Open `AutoHideAgent.app` and click **Grant Access** when prompted for Accessibility permissions (required by macOS WindowServer so background agents can hide other applications).
+1. Extract `dist/AutoHide-macOS-v1.0.0.zip`.
+2. Drag `AutoHide.app` into `/Applications`.
+3. Open `AutoHide.app` and click **Grant Access** when prompted for Accessibility permissions (required by macOS WindowServer so background agents can hide other applications).
 
 ---
 
@@ -71,8 +71,8 @@ AutoHideAgent/
 ├── generate_icon.swift                       # CoreGraphics vector icon generator script
 ├── bundle.sh                                 # Debug/Release build, .app packager, signer & ZIP archiver
 ├── dist/
-│   ├── AutoHideAgent-macOS-v1.0.0.zip        # Signed Release .app archive
-│   └── AutoHideAgent-macOS-v1.0.0.zip.sha256 # SHA-256 checksum
+│   ├── AutoHide-macOS-v1.0.0.zip        # Signed Release .app archive
+│   └── AutoHide-macOS-v1.0.0.zip.sha256 # SHA-256 checksum
 ├── README.md                                 # Comprehensive user & architecture documentation
 ├── AGENTS.md                                 # AI Coding Agent instructions (Codex, ChatGPT, Cursor, etc.)
 ├── CLAUDE.md                                 # Claude Code entry point
@@ -99,11 +99,11 @@ AutoHideAgent/
 # 1. Run the automated Swift Testing unit test suite
 swift test
 
-# 2. Build a Release .app bundle and generate dist/AutoHideAgent-macOS-v1.0.0.zip
+# 2. Build a Release .app bundle and generate dist/AutoHide-macOS-v1.0.0.zip
 ./bundle.sh release
 
 # 3. Build a Debug .app bundle and launch it
-./bundle.sh debug && open ./build/AutoHideAgent.app
+./bundle.sh debug && open ./build/AutoHide.app
 
 # 4. Regenerate AppIcon.icns from vector CoreGraphics script (optional)
 swift generate_icon.swift && iconutil -c icns build/AppIcon.iconset -o AppIcon.icns

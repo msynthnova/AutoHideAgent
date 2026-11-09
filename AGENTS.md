@@ -23,7 +23,7 @@ This document provides complete context for AI coding assistants (**Claude Code*
 | `Sources/AutoHideAgent/MainDashboardView.swift` | Full macOS desktop window (`NavigationSplitView`). Left sidebar holds settings cards; right detail pane hosts **Running Apps**, **Exclusions**, and **Recent Activity** tabs. |
 | `Sources/AutoHideAgent/MenuPopoverView.swift` | Compact 330pt Control-Center-style menu bar popover with quick actions, segmented presets, `Exclusions` / `Live Timers` toggle, and **Recent Activity** log. |
 | `Tests/AutoHideAgentTests/AutoHideAgentTests.swift` | Automated unit test suite using Swift's native `Testing` framework (`@Suite`, `@Test`, `#expect`). |
-| `bundle.sh` | Compiles the binary, constructs `build/AutoHideAgent.app`, copies `Info.plist` and `AppIcon.icns`, and signs with `AutoHideAgent.entitlements`. |
+| `bundle.sh` | Compiles the binary, constructs `build/AutoHide.app`, copies `Info.plist` and `AppIcon.icns`, and signs with `AutoHideAgent.entitlements`. |
 
 ---
 
@@ -37,7 +37,7 @@ Whenever you modify any Swift file in `Sources/` or `Tests/`:
    ```
    Ensure all tests pass with **0 warnings** and **0 errors**.
 
-2. **Rebuild & Re-bundle `AutoHideAgent.app`:**
+2. **Rebuild & Re-bundle `AutoHide.app`:**
    ```bash
    /Users/flx/local/code/AutoHideAgent/bundle.sh
    ```
@@ -45,7 +45,7 @@ Whenever you modify any Swift file in `Sources/` or `Tests/`:
 
 3. **Launch & Verify:**
    ```bash
-   open /Users/flx/local/code/AutoHideAgent/build/AutoHideAgent.app
+   open /Users/flx/local/code/AutoHideAgent/build/AutoHide.app
    ```
 
 ---
