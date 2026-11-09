@@ -346,6 +346,9 @@ public final class AutoHideManager {
     private let timerInterval: TimeInterval = 15.0
     private let timerTolerance: TimeInterval = 5.0
 
+    /// In-memory application icon cache to eliminate disk lookups and image decoding during periodic ticks.
+    private var iconCache: [String: NSImage] = [:]
+
     // MARK: - Initialization
 
     public init() {
@@ -785,7 +788,9 @@ public final class AutoHideManager {
                         self.recomputeMostRecentBackgroundPID()
                     }
                 }
-                self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+                if !self.isAccessibilityTrusted {
+                    self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+                }
                 self.refreshRunningApps()
             }
         }
@@ -811,7 +816,9 @@ public final class AutoHideManager {
                         self.mostRecentBackgroundPID = pid
                     }
                 }
-                self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+                if !self.isAccessibilityTrusted {
+                    self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+                }
                 self.refreshRunningApps()
             }
         }
@@ -824,6 +831,7 @@ public final class AutoHideManager {
         ) { [weak self] notification in
             let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
             let pid = app?.processIdentifier
+            let bundleID = app?.bundleIdentifier
             MainActor.assumeIsolated {
                 guard let self else { return }
                 if let pid {
@@ -835,7 +843,12 @@ public final class AutoHideManager {
                         self.recomputeMostRecentBackgroundPID()
                     }
                 }
-                self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+                if let bundleID {
+                    self.iconCache.removeValue(forKey: bundleID)
+                }
+                if !self.isAccessibilityTrusted {
+                    self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+                }
                 self.refreshRunningApps()
             }
         }
@@ -856,7 +869,9 @@ public final class AutoHideManager {
                     self.lastDeactivatedDates[pid] = Date.now
                     self.lastDeactivatedUptimes[pid] = ProcessInfo.processInfo.systemUptime
                 }
-                self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+                if !self.isAccessibilityTrusted {
+                    self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+                }
                 self.refreshRunningApps()
             }
         }
@@ -1385,11 +1400,17 @@ public final class AutoHideManager {
                 let upElapsed = lastDeactivatedUptimes[pid].map { currentUptime - $0 } ?? wallElapsed
                 elapsed = max(0, min(wallElapsed, upElapsed))
             }
+            var icon = iconCache[bundleID]
+            if icon == nil, let appIcon = app.icon {
+                iconCache[bundleID] = appIcon
+                icon = appIcon
+            }
+
             return RunningAppInfo(
                 pid: pid,
                 bundleIdentifier: bundleID,
                 localizedName: name,
-                icon: app.icon,
+                icon: icon,
                 isHidden: app.isHidden,
                 isProtectedMostRecent: keepPreviousAppVisible && (pid == mostRecentBackgroundPID),
                 hasActivePowerAssertion: protectActiveMediaApps && assertionPIDs.contains(pid),

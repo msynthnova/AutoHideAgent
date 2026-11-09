@@ -34,7 +34,7 @@ public struct MainDashboardView: View {
         }
     }
 
-    private let uiRefreshTimer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
+    private let uiRefreshTimer = Timer.publish(every: 5.0, tolerance: 1.0, on: .main, in: .common).autoconnect()
 
     public init(manager: AutoHideManager) {
         self.manager = manager
@@ -134,10 +134,14 @@ public struct MainDashboardView: View {
             manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
         }
         .onReceive(uiRefreshTimer) { _ in
-            guard NSApplication.shared.windows.contains(where: { $0.title == "AutoHideAgent" && $0.isVisible }) else {
+            guard let window = NSApplication.shared.windows.first(where: { $0.title == "AutoHideAgent" }),
+                  window.isVisible,
+                  window.occlusionState.contains(.visible) else {
                 return
             }
-            manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+            if !manager.isAccessibilityTrusted {
+                manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+            }
             if selectedSection == .runningApps {
                 manager.refreshRunningApps()
             }
