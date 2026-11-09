@@ -96,6 +96,28 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
                 }
             }
         }
+
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.example.AutoHideAgent.debugSnapshotMainWindow"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let snapshotPath = notification.object as? String
+            MainActor.assumeIsolated {
+                guard let self, let snapshotPath, let contentView = self.mainWindow?.contentView else { return }
+                self.showMainWindow()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    contentView.layoutSubtreeIfNeeded()
+                    let bounds = contentView.bounds
+                    if let rep = contentView.bitmapImageRepForCachingDisplay(in: bounds) {
+                        contentView.cacheDisplay(in: bounds, to: rep)
+                        if let pngData = rep.representation(using: .png, properties: [:]) {
+                            try? pngData.write(to: URL(fileURLWithPath: snapshotPath))
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Re-opens the main desktop window when the user clicks the Dock icon if the window was closed.

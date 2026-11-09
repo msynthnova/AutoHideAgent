@@ -335,6 +335,7 @@ public final class AutoHideManager {
     // MARK: - Private Machinery
 
     private var evaluationTimer: Timer?
+    private var accessibilityPollTimer: Timer?
     private var workspaceObservers: [NSObjectProtocol] = []
     private var distributedObservers: [NSObjectProtocol] = []
 
@@ -382,6 +383,7 @@ public final class AutoHideManager {
         refreshRunningApps()
         refreshLaunchAtLoginStatus()
         refreshAccessibilityTrustStatus(promptIfNeeded: false)
+        startAccessibilityTrustPollingIfNeeded()
         appendLog(
             .info,
             "AutoHide is running and watching background apps.",
@@ -420,12 +422,29 @@ public final class AutoHideManager {
 
     // MARK: - Instant "Hide Background Apps Now" Action
 
+    /// Number of currently visible (unhidden) background `.regular` applications that are eligible to be hidden.
+    public var visibleBackgroundAppsCount: Int {
+        runningRegularApps.filter { app in
+            !app.isHidden && !whitelistedBundleIDs.contains {
+                $0.caseInsensitiveCompare(app.bundleIdentifier) == .orderedSame ||
+                $0.caseInsensitiveCompare(app.localizedName) == .orderedSame
+            }
+        }.count
+    }
+
+    /// Number of currently hidden background `.regular` applications.
+    public var hiddenBackgroundAppsCount: Int {
+        runningRegularApps.filter { $0.isHidden }.count
+    }
+
     /// Immediately hides all currently visible, non-whitelisted background `.regular` applications.
     public func hideAllBackgroundAppsNow() {
+        refreshAccessibilityTrustStatus(promptIfNeeded: false)
         let frontmostApp = NSWorkspace.shared.frontmostApplication
         let myPID = ProcessInfo.processInfo.processIdentifier
-        let protectedAssertions = protectActiveMediaApps ? activePowerAssertionPIDs() : []
         var hiddenCount = 0
+        var eligibleCount = 0
+        var blockedByAX = false
 
         for app in NSWorkspace.shared.runningApplications {
             let pid = app.processIdentifier
@@ -439,32 +458,48 @@ public final class AutoHideManager {
                 continue
             }
 
-            if keepPreviousAppVisible, pid == mostRecentBackgroundPID {
-                continue
-            }
-
-            if protectActiveMediaApps, protectedAssertions.contains(pid) {
-                continue
-            }
+            eligibleCount += 1
 
             if app.hide() {
                 hiddenCount += 1
-            } else if case .hidden = hideViaAccessibilityIfTrusted(pid: pid) {
-                hiddenCount += 1
+            } else {
+                let axOutcome = hideViaAccessibilityIfTrusted(pid: pid)
+                switch axOutcome {
+                case .hidden:
+                    hiddenCount += 1
+                case .notTrusted:
+                    blockedByAX = true
+                case .failed:
+                    break
+                }
             }
+        }
+
+        // If the user clicked "Hide Other Apps" while inside AutoHide itself and Accessibility wasn't granted yet,
+        // use AppKit's native hideOtherApplications so it still works immediately.
+        if hiddenCount == 0 && eligibleCount > 0 && NSApplication.shared.isActive {
+            NSApplication.shared.hideOtherApplications(nil)
+            hiddenCount = eligibleCount
+            blockedByAX = false
         }
 
         if hiddenCount > 0 {
             appendLog(
                 .action,
                 "Hid \(hiddenCount) background \(hiddenCount == 1 ? "app" : "apps") right away.",
-                technical: "manual hideAllBackgroundAppsNow() count=\(hiddenCount)"
+                technical: "manual hideAllBackgroundAppsNow() count=\(hiddenCount)/\(eligibleCount)"
+            )
+        } else if blockedByAX && eligibleCount > 0 {
+            appendLog(
+                .warning,
+                "Grant Accessibility permission so AutoHide can hide \(eligibleCount) background \(eligibleCount == 1 ? "app" : "apps").",
+                technical: "manual hideAllBackgroundAppsNow() blocked: AXIsProcessTrusted=false, eligible=\(eligibleCount)"
             )
         } else {
             appendLog(
                 .info,
-                "No visible background apps needed hiding.",
-                technical: "manual hideAllBackgroundAppsNow() count=0"
+                "All background apps are already hidden.",
+                technical: "manual hideAllBackgroundAppsNow() count=0, eligible=0"
             )
         }
         refreshRunningApps()
@@ -744,6 +779,7 @@ public final class AutoHideManager {
                         self.recomputeMostRecentBackgroundPID()
                     }
                 }
+                self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
                 self.refreshRunningApps()
             }
         }
@@ -769,6 +805,7 @@ public final class AutoHideManager {
                         self.mostRecentBackgroundPID = pid
                     }
                 }
+                self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
                 self.refreshRunningApps()
             }
         }
@@ -792,6 +829,7 @@ public final class AutoHideManager {
                         self.recomputeMostRecentBackgroundPID()
                     }
                 }
+                self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
                 self.refreshRunningApps()
             }
         }
@@ -812,6 +850,7 @@ public final class AutoHideManager {
                     self.lastDeactivatedDates[pid] = Date.now
                     self.lastDeactivatedUptimes[pid] = ProcessInfo.processInfo.systemUptime
                 }
+                self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
                 self.refreshRunningApps()
             }
         }
@@ -847,6 +886,7 @@ public final class AutoHideManager {
                         technical: "didUnhideApplication pid=\(pid)"
                     )
                 }
+                self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
                 self.refreshRunningApps()
             }
         }
@@ -1404,6 +1444,62 @@ public final class AutoHideManager {
         } else {
             isAccessibilityTrusted = trusted
         }
+
+        if promptIfNeeded && !trusted {
+            openSystemAccessibilityPrivacyPane()
+        }
+        startAccessibilityTrustPollingIfNeeded()
+    }
+
+    /// Resets any stale macOS TCC Accessibility entry for this bundle ID (e.g., from an older build)
+    /// and immediately triggers a fresh permission prompt + opens System Settings.
+    public func resetAndPromptAccessibilityPermission() {
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.systems.autohideagent"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        process.arguments = ["reset", "Accessibility", bundleID]
+        try? process.run()
+        process.waitUntilExit()
+
+        appendLog(
+            .info,
+            "Refreshed macOS Accessibility permission registration — toggle AutoHide ON in System Settings.",
+            technical: "tccutil reset Accessibility \(bundleID)"
+        )
+        refreshAccessibilityTrustStatus(promptIfNeeded: true)
+    }
+
+    public func openSystemAccessibilityPrivacyPane() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func startAccessibilityTrustPollingIfNeeded() {
+        accessibilityPollTimer?.invalidate()
+        accessibilityPollTimer = nil
+        guard !isAccessibilityTrusted else { return }
+
+        let timer = Timer(timeInterval: 1.5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let trusted = self.checkAccessibilityPermissions(promptIfNeeded: false)
+                if trusted != self.isAccessibilityTrusted {
+                    self.isAccessibilityTrusted = trusted
+                    self.appendLog(
+                        .info,
+                        trusted ? "Accessibility permission detected — ready to hide apps." : "Accessibility permission turned off.",
+                        technical: "live poll AXIsProcessTrusted=\(trusted)"
+                    )
+                    if trusted {
+                        self.accessibilityPollTimer?.invalidate()
+                        self.accessibilityPollTimer = nil
+                    }
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        accessibilityPollTimer = timer
     }
 
     private enum AXHideOutcome {

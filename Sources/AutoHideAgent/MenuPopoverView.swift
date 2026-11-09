@@ -360,22 +360,27 @@ public struct MenuPopoverView: View {
     // MARK: - 3. Quick Actions Row
 
     private var hideNowActionRow: some View {
-        controlCenterItemRow(
+        let visibleCount = manager.visibleBackgroundAppsCount
+        let subtitleText = visibleCount > 0
+            ? "Hide \(visibleCount) visible background \(visibleCount == 1 ? "app" : "apps") right now"
+            : "All background apps are already hidden"
+
+        return controlCenterItemRow(
             id: "row.hideNow",
-            icon: "sparkles.rectangle.stack.fill",
-            isActive: false,
+            icon: "eye.slash.circle.fill",
+            isActive: visibleCount > 0,
             activeTint: .accentColor,
-            title: "Hide Background Apps Now",
-            subtitle: "Keep only frontmost app visible",
+            title: "Hide Other Open Apps Now",
+            subtitle: subtitleText,
             showsChevron: false,
             isExpanded: false,
             onIconTap: {
-                manager.hideAllBackgroundAppsNow()
                 onClosePanel?()
+                manager.hideAllBackgroundAppsNow()
             },
             onRowTap: {
-                manager.hideAllBackgroundAppsNow()
                 onClosePanel?()
+                manager.hideAllBackgroundAppsNow()
             }
         )
     }

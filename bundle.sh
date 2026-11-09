@@ -34,8 +34,17 @@ fi
 sed 's/\$(EXECUTABLE_NAME)/AutoHideAgent/g' "$PROJECT_DIR/Info.plist" > "$CONTENTS_DIR/Info.plist"
 echo -n "APPL????" > "$CONTENTS_DIR/PkgInfo"
 
-echo "==> Signing $APP_BUNDLE with ad-hoc signature and entitlements..."
-codesign --force --deep --sign - --entitlements "$PROJECT_DIR/AutoHideAgent.entitlements" "$APP_BUNDLE"
+# Prefer a real Apple Development identity from Keychain so macOS Accessibility (TCC)
+# permission persists across rebuilds instead of breaking on ad-hoc cdhash changes.
+SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Apple Development:[^"]*\)".*/\1/p' | head -n 1)
+if [[ -z "$SIGN_IDENTITY" ]]; then
+    SIGN_IDENTITY="-"
+    echo "==> Signing $APP_BUNDLE with ad-hoc signature and entitlements..."
+else
+    echo "==> Signing $APP_BUNDLE with '$SIGN_IDENTITY' and entitlements..."
+fi
+
+codesign --force --deep --sign "$SIGN_IDENTITY" --entitlements "$PROJECT_DIR/AutoHideAgent.entitlements" "$APP_BUNDLE"
 
 if [[ "$MODE" == "release" ]]; then
     mkdir -p "$DIST_DIR"
