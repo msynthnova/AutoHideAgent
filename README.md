@@ -15,8 +15,8 @@ Install directly via the custom tap:
 # Add the tap and install AutoHideAgent (bypass Gatekeeper quarantine automatically)
 brew install --cask --no-quarantine msynthnova/tap/autohideagent
 
-# Update anytime via Homebrew:
-brew upgrade --cask autohideagent
+# Update anytime via Homebrew (use --greedy because auto_updates is enabled for Sparkle):
+brew upgrade --cask --greedy autohideagent
 ```
 
 ### Method B: In-App Updates via Sparkle 2

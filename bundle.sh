@@ -167,6 +167,12 @@ cask "autohideagent" do
 end
 EOF
     echo "==> Homebrew Cask formula updated at $CASK_FILE"
+
+    LOCAL_TAP_DIR="/opt/homebrew/Library/Taps/msynthnova/homebrew-tap"
+    if [[ -d "$LOCAL_TAP_DIR/Casks" ]]; then
+        cp "$CASK_FILE" "$LOCAL_TAP_DIR/Casks/autohideagent.rb"
+        echo "==> Synced Cask to local Homebrew tap at $LOCAL_TAP_DIR/Casks/autohideagent.rb"
+    fi
 fi
 
 echo "==> Bundle ready at: $APP_BUNDLE"
