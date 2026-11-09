@@ -123,7 +123,7 @@ public struct MainDashboardView: View {
     private var mainContent: some View {
         NavigationSplitView {
             sidebarView
-                .navigationSplitViewColumnWidth(min: 195, ideal: 205, max: 225)
+                .navigationSplitViewColumnWidth(min: 220, ideal: 235, max: 260)
         } detail: {
             detailCanvas
         }
@@ -164,11 +164,22 @@ public struct MainDashboardView: View {
     private var sidebarView: some View {
         List(selection: $selectedSection) {
             ForEach(NavigationSection.allCases) { section in
-                Label(section.rawValue, systemImage: section.icon)
-                    .font(.system(size: 13))
-                    .badge(badgeCount(for: section))
-                    .tag(section)
-                    .pointerStyle(.link)
+                HStack(spacing: 9) {
+                    Image(systemName: section.icon)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(selectedSection == section ? Color.primary : Color.accentColor)
+                        .frame(width: 20, alignment: .center)
+
+                    Text(section.rawValue)
+                        .font(.system(size: 13, weight: selectedSection == section ? .medium : .regular))
+
+                    Spacer()
+                }
+                .padding(.leading, 4)
+                .listRowInsets(EdgeInsets(top: 4, leading: 14, bottom: 4, trailing: 12))
+                .badge(badgeCount(for: section))
+                .tag(section)
+                .pointerStyle(.link)
             }
         }
         .listStyle(.sidebar)

@@ -277,7 +277,6 @@ public struct MenuPopoverView: View {
                 submenuCheckmarkRow(
                     id: "autohide.\(preset.rawValue)",
                     title: preset.descriptiveLabel,
-                    icon: "timer",
                     isSelected: isSelected
                 ) {
                     manager.isEnabled = true
@@ -289,7 +288,6 @@ public struct MenuPopoverView: View {
             submenuCheckmarkRow(
                 id: "autohide.off",
                 title: "Off",
-                icon: "eye",
                 isSelected: !manager.isAutoHideEnabled
             ) {
                 manager.isAutoHideEnabled = false
@@ -341,7 +339,6 @@ public struct MenuPopoverView: View {
                 submenuCheckmarkRow(
                     id: "autoquit.\(preset.rawValue)",
                     title: preset.descriptiveLabel,
-                    icon: "clock.badge.xmark",
                     isSelected: isSelected
                 ) {
                     manager.isEnabled = true
@@ -353,7 +350,6 @@ public struct MenuPopoverView: View {
             submenuCheckmarkRow(
                 id: "autoquit.off",
                 title: "Off",
-                icon: "xmark.circle",
                 isSelected: !manager.isAutoQuitEnabled
             ) {
                 manager.isAutoQuitEnabled = false
@@ -362,19 +358,46 @@ public struct MenuPopoverView: View {
             hairlineDivider
                 .padding(.vertical, 4)
 
-            submenuCheckmarkRow(
-                id: "autoquit.confirm",
-                title: "Ask Confirmation Before Quitting",
-                icon: "checkmark.shield",
-                isSelected: manager.confirmBeforeAutoQuit
-            ) {
-                manager.confirmBeforeAutoQuit.toggle()
-            }
-            .padding(.bottom, 6)
+            confirmationCheckboxRow
+                .padding(.bottom, 6)
         }
         .background(Color.primary.opacity(0.06))
         .overlay(alignment: .top) { hairlineDivider }
         .overlay(alignment: .bottom) { hairlineDivider }
+    }
+
+    private var confirmationCheckboxRow: some View {
+        let isHovered = (hoveredRowID == "autoquit.confirm")
+
+        return Button {
+            manager.confirmBeforeAutoQuit.toggle()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: manager.confirmBeforeAutoQuit ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(manager.confirmBeforeAutoQuit ? Color.accentColor : Color.secondary)
+                    .frame(width: 14, alignment: .center)
+
+                Text("Ask Confirmation Before Quitting")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
+            )
+            .padding(.horizontal, 6)
+        }
+        .buttonStyle(.plain)
+        .pointerStyle(.link)
+        .onHover { hovering in
+            hoveredRowID = hovering ? "autoquit.confirm" : (hoveredRowID == "autoquit.confirm" ? nil : hoveredRowID)
+        }
     }
 
     private var snoozeControlCenterRow: some View {
@@ -436,9 +459,10 @@ public struct MenuPopoverView: View {
 
     private var hairlineDivider: some View {
         Rectangle()
-            .fill(Color.primary.opacity(0.11))
+            .fill(Color.primary.opacity(0.12))
             .frame(height: 0.75)
-            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 10)
     }
 
     @ViewBuilder
@@ -517,27 +541,21 @@ public struct MenuPopoverView: View {
     private func submenuCheckmarkRow(
         id: String,
         title: String,
-        icon: String,
         isSelected: Bool,
         action: @escaping () -> Void
     ) -> some View {
         let isHovered = (hoveredRowID == id)
 
         Button(action: action) {
-            HStack(spacing: 9) {
+            HStack(spacing: 8) {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
                     .opacity(isSelected ? 1.0 : 0.0)
                     .frame(width: 14, alignment: .center)
 
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 16, alignment: .center)
-
                 Text(title)
-                    .font(.system(size: 12, weight: isSelected ? .medium : .regular))
+                    .font(.system(size: 12.5, weight: isSelected ? .medium : .regular))
                     .foregroundStyle(.primary)
 
                 Spacer()
@@ -547,7 +565,7 @@ public struct MenuPopoverView: View {
             .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(isHovered ? Color.primary.opacity(0.09) : Color.clear)
+                    .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
             )
             .padding(.horizontal, 6)
         }
