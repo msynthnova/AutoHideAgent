@@ -59,9 +59,9 @@ public struct MainDashboardView: View {
             if let appIcon = NSApplication.shared.applicationIconImage {
                 Image(nsImage: appIcon).resizable().frame(width: 84, height: 84)
             }
-            Text("Welcome to AutoHide")
+            Text("Welcome to AutoHideAgent")
                 .font(.system(size: 24, weight: .bold))
-            Text("AutoHide needs Accessibility access so macOS lets it hide and manage other apps' windows. It never reads your screen or keystrokes.")
+            Text("AutoHideAgent needs Accessibility access so macOS lets it hide and manage other apps' windows. It never reads your screen or keystrokes.")
                 .font(.system(size: 13.5))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -70,7 +70,7 @@ public struct MainDashboardView: View {
             VStack(alignment: .leading, spacing: 10) {
                 setupStep(1, "Click \"Grant Access…\" below to open System Settings.")
                 setupStep(2, "Go to Privacy & Security → Accessibility.")
-                setupStep(3, "Turn the switch next to AutoHide ON.")
+                setupStep(3, "Turn the switch next to AutoHideAgent ON.")
             }
             .padding(14)
             .frame(maxWidth: 440, alignment: .leading)
@@ -91,7 +91,7 @@ public struct MainDashboardView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.large)
                 .pointerStyle(.link)
-                .help("Use this if AutoHide is already switched on in System Settings but still isn't detected")
+                .help("Use this if AutoHideAgent is already switched on in System Settings but still isn't detected")
             }
 
             HStack(spacing: 6) {
@@ -133,7 +133,7 @@ public struct MainDashboardView: View {
             manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
         }
         .onReceive(uiRefreshTimer) { _ in
-            guard NSApplication.shared.windows.contains(where: { $0.title == "AutoHide" && $0.isVisible }) else {
+            guard NSApplication.shared.windows.contains(where: { $0.title == "AutoHideAgent" && $0.isVisible }) else {
                 return
             }
             manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
@@ -214,7 +214,7 @@ public struct MainDashboardView: View {
     }
 
     private var statusSummaryText: String {
-        guard manager.isEnabled else { return "AutoHide is Off" }
+        guard manager.isEnabled else { return "AutoHideAgent is Off" }
         if let until = manager.pausedUntilDate, Date.now < until {
             return "Paused (\(manager.formatFriendlyDuration(until.timeIntervalSinceNow)))"
         }
@@ -261,7 +261,7 @@ public struct MainDashboardView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("AutoHide")
+                            Text("AutoHideAgent")
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(.primary)
 
@@ -475,7 +475,7 @@ public struct MainDashboardView: View {
                 settingsGroupBox {
                     VStack(alignment: .leading, spacing: 0) {
                         settingsToggleRow(
-                            title: "Show AutoHide in Menu Bar",
+                            title: "Show AutoHideAgent in Menu Bar",
                             subtitle: "Display the quick Control Center panel icon in your top macOS menu bar.",
                             isOn: $manager.showInMenuBar
                         )
@@ -483,15 +483,15 @@ public struct MainDashboardView: View {
                         Divider().padding(.horizontal, 14)
 
                         settingsToggleRow(
-                            title: "Show AutoHide in Dock",
-                            subtitle: "Keep AutoHide visible in the macOS Dock and Command-Tab app switcher.",
+                            title: "Show AutoHideAgent in Dock",
+                            subtitle: "Keep AutoHideAgent visible in the macOS Dock and Command-Tab app switcher.",
                             isOn: $manager.showInDock
                         )
 
                         Divider().padding(.horizontal, 14)
 
                         settingsToggleRow(
-                            title: "Launch AutoHide at Login",
+                            title: "Launch AutoHideAgent at Login",
                             subtitle: "Start automatically in the background when you sign in to your Mac.",
                             isOn: Binding(
                                 get: { manager.launchAtLoginEnabled },
@@ -532,8 +532,8 @@ public struct MainDashboardView: View {
 
                     Text(
                         manager.isAccessibilityTrusted
-                            ? "macOS allows AutoHide to hide background applications automatically."
-                            : "Click \"Grant Access\" and enable AutoHide in System Settings → Privacy & Security → Accessibility."
+                            ? "macOS allows AutoHideAgent to hide background applications automatically."
+                            : "Click \"Grant Access\" and enable AutoHideAgent in System Settings → Privacy & Security → Accessibility."
                     )
                     .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)

@@ -183,7 +183,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             backing: .buffered,
             defer: false
         )
-        window.title = "AutoHide"
+        window.title = "AutoHideAgent"
         window.titlebarAppearsTransparent = false
         window.toolbarStyle = .unified
         window.isOpaque = true
@@ -209,19 +209,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         window.makeKeyAndOrderFront(nil)
     }
 
-    // MARK: - Setup Standard macOS Menu Bar (AutoHide, Window)
+    // MARK: - Setup Standard macOS Menu Bar (AutoHideAgent, Window)
 
     private func setupMainMenuBar() {
         let mainMenu = NSMenu()
 
-        // 1. Application Menu ("AutoHide")
+        // 1. Application Menu ("AutoHideAgent")
         let appMenuItem = NSMenuItem()
         mainMenu.addItem(appMenuItem)
         let appMenu = NSMenu()
         appMenuItem.submenu = appMenu
 
         let openDashboardItem = NSMenuItem(
-            title: "Open AutoHide Window",
+            title: "Open AutoHideAgent Window",
             action: #selector(openDashboardFromMenu(_:)),
             keyEquivalent: "0"
         )
@@ -246,9 +246,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         appMenu.addItem(openLogItem)
 
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide AutoHide", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: "Hide AutoHideAgent", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Quit AutoHide", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Quit AutoHideAgent", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         // 2. Window Menu
         let windowMenuItem = NSMenuItem()
@@ -331,11 +331,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         let active = autoHideManager.isEnabled && !autoHideManager.isTemporarilyPaused
         let description: String
         if !autoHideManager.isEnabled {
-            description = "AutoHide: Disabled"
+            description = "AutoHideAgent: Disabled"
         } else if autoHideManager.isTemporarilyPaused {
-            description = "AutoHide: Snoozed for 1 Hour"
+            description = "AutoHideAgent: Snoozed for 1 Hour"
         } else {
-            description = "AutoHide: Active (Right-click to Hide Others Now)"
+            description = "AutoHideAgent: Active (Right-click to Hide Others Now)"
         }
 
         button.image = makeMenuBarIcon(isEnabled: active)
@@ -355,46 +355,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         button.highlight(highlighted)
     }
 
-    /// Draws a custom, pixel-aligned 18x18 macOS menu bar template icon (front window + receding dashed window).
+    /// Native SF Symbol menu bar icon (matches weight/size of Apple's own menu extras).
     private func makeMenuBarIcon(isEnabled: Bool) -> NSImage {
-        let size = NSSize(width: 18, height: 18)
-        let image = NSImage(size: size, flipped: false) { _ in
-            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
-
-            let alpha: CGFloat = isEnabled ? 1.0 : 0.45
-
-            // Back window (receding dashed outline)
-            let backRect = CGRect(x: 6.5, y: 6.5, width: 9.5, height: 7.5)
-            let backPath = NSBezierPath(roundedRect: backRect, xRadius: 1.8, yRadius: 1.8)
-            NSColor.labelColor.withAlphaComponent(alpha * 0.65).setStroke()
-            backPath.lineWidth = 1.2
-            let dash: [CGFloat] = [2.0, 1.5]
-            backPath.setLineDash(dash, count: 2, phase: 0)
-            backPath.stroke()
-
-            // Clear region behind front window so overlapping lines don't clutter
-            ctx.saveGState()
-            ctx.setBlendMode(.clear)
-            let clearRect = CGRect(x: 1.2, y: 2.2, width: 10.6, height: 8.6)
-            NSBezierPath(roundedRect: clearRect, xRadius: 2.0, yRadius: 2.0).fill()
-            ctx.restoreGState()
-
-            // Front window (solid crisp outline + title bar)
-            let frontRect = CGRect(x: 2.0, y: 3.0, width: 9.5, height: 7.5)
-            let frontPath = NSBezierPath(roundedRect: frontRect, xRadius: 1.8, yRadius: 1.8)
-            NSColor.labelColor.withAlphaComponent(alpha).setStroke()
-            frontPath.lineWidth = 1.35
-            frontPath.stroke()
-
-            // Title bar line inside front window
-            let titleBar = NSBezierPath()
-            titleBar.move(to: CGPoint(x: frontRect.minX, y: frontRect.maxY - 2.3))
-            titleBar.line(to: CGPoint(x: frontRect.maxX, y: frontRect.maxY - 2.3))
-            titleBar.lineWidth = 1.1
-            titleBar.stroke()
-
-            return true
-        }
+        let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular, scale: .medium)
+        let name = isEnabled ? "macwindow.on.rectangle" : "macwindow"
+        let image = NSImage(systemSymbolName: name, accessibilityDescription: "AutoHideAgent")?
+            .withSymbolConfiguration(config) ?? NSImage()
         image.isTemplate = true
         return image
     }

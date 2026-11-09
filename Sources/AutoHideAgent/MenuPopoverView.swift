@@ -81,17 +81,17 @@ public struct MenuPopoverView: View {
                 .foregroundStyle(.orange)
             Text("Setup Required")
                 .font(.system(size: 14, weight: .semibold))
-            Text("Grant Accessibility access to start using AutoHide.")
+            Text("Grant Accessibility access to start using AutoHideAgent.")
                 .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("Open AutoHide to Set Up") {
+            Button("Open AutoHideAgent to Set Up") {
                 onClosePanel?()
                 onOpenMainWindow?()
             }
             .buttonStyle(.borderedProminent)
             .pointerStyle(.link)
-            Button("Quit AutoHide") { NSApplication.shared.terminate(nil) }
+            Button("Quit AutoHideAgent") { NSApplication.shared.terminate(nil) }
                 .buttonStyle(.plain)
                 .pointerStyle(.link)
                 .font(.system(size: 11.5))
@@ -102,7 +102,7 @@ public struct MenuPopoverView: View {
 
     private var fullPanelContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // 1. Header ("AutoHide" + Master Switch)
+            // 1. Header ("AutoHideAgent" + Master Switch)
             headerBar
                 .padding(.horizontal, 14)
                 .padding(.top, 12)
@@ -144,7 +144,7 @@ public struct MenuPopoverView: View {
             VStack(alignment: .leading, spacing: 2) {
                 footerMenuLinkRow(
                     id: "footer.openWindow",
-                    title: "AutoHide Settings…",
+                    title: "AutoHideAgent Settings…",
                     shortcutHint: "⌘0"
                 ) {
                     onClosePanel?()
@@ -161,7 +161,7 @@ public struct MenuPopoverView: View {
 
                 footerMenuLinkRow(
                     id: "footer.quit",
-                    title: "Quit AutoHide",
+                    title: "Quit AutoHideAgent",
                     shortcutHint: "⌘Q"
                 ) {
                     NSApplication.shared.terminate(nil)
@@ -190,7 +190,7 @@ public struct MenuPopoverView: View {
     private var headerBar: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("AutoHide")
+                Text("AutoHideAgent")
                     .font(.system(size: 13.5, weight: .semibold))
                     .foregroundStyle(.primary)
 

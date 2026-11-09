@@ -1,19 +1,19 @@
-# AutoHide (`AutoHideAgent`) for macOS
+# AutoHideAgent (`AutoHideAgent`) for macOS
 
-**AutoHide** is a native macOS desktop and menu bar application written in **Swift 6** that automatically hides or gracefully quits inactive background applications after a configurable threshold—keeping your workspace focused and clutter-free while intelligently pausing timers during sleep, screen-off, lock screen, screensaver, and active audio/video playback.
+**AutoHideAgent** is a native macOS desktop and menu bar application written in **Swift 6** that automatically hides or gracefully quits inactive background applications after a configurable threshold—keeping your workspace focused and clutter-free while intelligently pausing timers during sleep, screen-off, lock screen, screensaver, and active audio/video playback.
 
 ---
 
 ## Download & Release Package
 
 A pre-built, signed Release `.app` archive is included directly in this repository:
-- **Release Archive:** [`dist/AutoHide-macOS-v1.0.0.zip`](./dist/AutoHide-macOS-v1.0.0.zip)
-- **SHA-256 Checksum:** [`dist/AutoHide-macOS-v1.0.0.zip.sha256`](./dist/AutoHide-macOS-v1.0.0.zip.sha256)
+- **Release Archive:** [`dist/AutoHideAgent-macOS-v1.0.0.zip`](./dist/AutoHideAgent-macOS-v1.0.0.zip)
+- **SHA-256 Checksum:** [`dist/AutoHideAgent-macOS-v1.0.0.zip.sha256`](./dist/AutoHideAgent-macOS-v1.0.0.zip.sha256)
 
 ### Quick Installation from ZIP
-1. Extract `dist/AutoHide-macOS-v1.0.0.zip`.
-2. Drag `AutoHide.app` into `/Applications`.
-3. Open `AutoHide.app` and click **Grant Access** when prompted for Accessibility permissions (required by macOS WindowServer so background agents can hide other applications).
+1. Extract `dist/AutoHideAgent-macOS-v1.0.0.zip`.
+2. Drag `AutoHideAgent.app` into `/Applications`.
+3. Open `AutoHideAgent.app` and click **Grant Access** when prompted for Accessibility permissions (required by macOS WindowServer so background agents can hide other applications).
 
 ---
 
@@ -42,7 +42,7 @@ A pre-built, signed Release `.app` archive is included directly in this reposito
   - Optional **"Ask for confirmation before quitting an app"** dialog (`confirmBeforeAutoQuit`) with 3 actions: **Quit [App]**, **Keep Open** (resets timer), or **Always Exclude [App]**.
 
 ### 3. Smart Protections & Hardware/Session Pause Engine
-- **Global HID Idle Guard (`CGEventSource`):** Queries `CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)`. If you step away from your keyboard/mouse/trackpad, AutoHide pauses evaluation—apps only hide or quit while you are actively working in another foreground app.
+- **Global HID Idle Guard (`CGEventSource`):** Queries `CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)`. If you step away from your keyboard/mouse/trackpad, AutoHideAgent pauses evaluation—apps only hide or quit while you are actively working in another foreground app.
 - **Sleep, Lid-Close, Screen-Off, Lock Screen & Screensaver Pause:**
   - Observes `NSWorkspace.willSleepNotification`, `didWakeNotification`, `screensDidSleepNotification`, `screensDidWakeNotification`, `CGDisplayIsAsleep(CGMainDisplayID())`, and `DistributedNotificationCenter` events (`com.apple.screensaver.didstart`/`didstop`, `com.apple.screenIsLocked`/`screenIsUnlocked`).
   - Tracks both wall-clock timestamps (`lastDeactivatedDates`) and XNU kernel monotonic awake time (`ProcessInfo.processInfo.systemUptime`). When your Mac wakes or unlocks, all timers shift forward by the exact paused duration.
@@ -71,8 +71,8 @@ AutoHideAgent/
 ├── generate_icon.swift                       # CoreGraphics vector icon generator script
 ├── bundle.sh                                 # Debug/Release build, .app packager, signer & ZIP archiver
 ├── dist/
-│   ├── AutoHide-macOS-v1.0.0.zip        # Signed Release .app archive
-│   └── AutoHide-macOS-v1.0.0.zip.sha256 # SHA-256 checksum
+│   ├── AutoHideAgent-macOS-v1.0.0.zip        # Signed Release .app archive
+│   └── AutoHideAgent-macOS-v1.0.0.zip.sha256 # SHA-256 checksum
 ├── README.md                                 # Comprehensive user & architecture documentation
 ├── AGENTS.md                                 # AI Coding Agent instructions (Codex, ChatGPT, Cursor, etc.)
 ├── CLAUDE.md                                 # Claude Code entry point
@@ -99,11 +99,11 @@ AutoHideAgent/
 # 1. Run the automated Swift Testing unit test suite
 swift test
 
-# 2. Build a Release .app bundle and generate dist/AutoHide-macOS-v1.0.0.zip
+# 2. Build a Release .app bundle and generate dist/AutoHideAgent-macOS-v1.0.0.zip
 ./bundle.sh release
 
 # 3. Build a Debug .app bundle and launch it
-./bundle.sh debug && open ./build/AutoHide.app
+./bundle.sh debug && open ./build/AutoHideAgent.app
 
 # 4. Regenerate AppIcon.icns from vector CoreGraphics script (optional)
 swift generate_icon.swift && iconutil -c icns build/AppIcon.iconset -o AppIcon.icns

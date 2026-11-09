@@ -127,7 +127,7 @@ public final class AutoHideManager {
             }
             appendLog(
                 .info,
-                isEnabled ? "Turned AutoHide Agent ON." : "Turned AutoHide Agent OFF.",
+                isEnabled ? "Turned AutoHideAgent Agent ON." : "Turned AutoHideAgent Agent OFF.",
                 technical: "isEnabled=\(isEnabled)"
             )
             handleEnabledStateChange()
@@ -252,7 +252,7 @@ public final class AutoHideManager {
             UserDefaults.standard.set(showInDock, forKey: Keys.showInDock)
             appendLog(
                 .info,
-                showInDock ? "Showing AutoHide in the macOS Dock." : "Hid AutoHide from the Dock (Menu Bar mode).",
+                showInDock ? "Showing AutoHideAgent in the macOS Dock." : "Hid AutoHideAgent from the Dock (Menu Bar mode).",
                 technical: "showInDock=\(showInDock)"
             )
             onAppearanceModeChange?()
@@ -270,7 +270,7 @@ public final class AutoHideManager {
             UserDefaults.standard.set(showInMenuBar, forKey: Keys.showInMenuBar)
             appendLog(
                 .info,
-                showInMenuBar ? "Showing AutoHide icon in the Menu Bar." : "Hid AutoHide icon from the Menu Bar.",
+                showInMenuBar ? "Showing AutoHideAgent icon in the Menu Bar." : "Hid AutoHideAgent icon from the Menu Bar.",
                 technical: "showInMenuBar=\(showInMenuBar)"
             )
             onAppearanceModeChange?()
@@ -386,7 +386,7 @@ public final class AutoHideManager {
         startAccessibilityTrustPollingIfNeeded()
         appendLog(
             .info,
-            "AutoHide is running and watching background apps.",
+            "AutoHideAgent is running and watching background apps.",
             technical: "init() completed; AX=\(isAccessibilityTrusted), autoHide=\(isAutoHideEnabled) (\(timeoutSeconds)s), autoQuit=\(isAutoQuitEnabled) (\(quitTimeoutSeconds)s), confirmQuit=\(confirmBeforeAutoQuit), keepPrev=\(keepPreviousAppVisible), protectMedia=\(protectActiveMediaApps)"
         )
         handleEnabledStateChange()
@@ -405,7 +405,7 @@ public final class AutoHideManager {
         } else {
             let until = Date.now.addingTimeInterval(3600)
             pausedUntilDate = until
-            appendLog(.info, "Paused AutoHide for 1 hour.", technical: "pausedUntil=\(Self.isoFormatter.string(from: until))")
+            appendLog(.info, "Paused AutoHideAgent for 1 hour.", technical: "pausedUntil=\(Self.isoFormatter.string(from: until))")
             onStateChange?()
         }
     }
@@ -415,7 +415,7 @@ public final class AutoHideManager {
         pausedUntilDate = nil
         // Reset background timestamps to now so apps aren't immediately hidden on unpause
         seedInitialBackgroundTimestamps()
-        appendLog(.info, "Resumed AutoHide from temporary pause.", technical: "manual/auto resume")
+        appendLog(.info, "Resumed AutoHideAgent from temporary pause.", technical: "manual/auto resume")
         onStateChange?()
         refreshRunningApps()
     }
@@ -476,7 +476,7 @@ public final class AutoHideManager {
             }
         }
 
-        // If the user clicked "Hide Other Apps" while inside AutoHide itself and Accessibility wasn't granted yet,
+        // If the user clicked "Hide Other Apps" while inside AutoHideAgent itself and Accessibility wasn't granted yet,
         // use AppKit's native hideOtherApplications so it still works immediately.
         if hiddenCount == 0 && eligibleCount > 0 && NSApplication.shared.isActive {
             NSApplication.shared.hideOtherApplications(nil)
@@ -493,7 +493,7 @@ public final class AutoHideManager {
         } else if blockedByAX && eligibleCount > 0 {
             appendLog(
                 .warning,
-                "Grant Accessibility permission so AutoHide can hide \(eligibleCount) background \(eligibleCount == 1 ? "app" : "apps").",
+                "Grant Accessibility permission so AutoHideAgent can hide \(eligibleCount) background \(eligibleCount == 1 ? "app" : "apps").",
                 technical: "manual hideAllBackgroundAppsNow() blocked: AXIsProcessTrusted=false, eligible=\(eligibleCount)"
             )
         } else {
@@ -1269,7 +1269,7 @@ public final class AutoHideManager {
         let alert = NSAlert()
         alert.alertStyle = .informational
         alert.messageText = "Quit Inactive App \"\(appName)\"?"
-        alert.informativeText = "\(appName) has been unused in the background for \(friendlyTime). Would you like AutoHide to quit it now?"
+        alert.informativeText = "\(appName) has been unused in the background for \(friendlyTime). Would you like AutoHideAgent to quit it now?"
         if let appIcon = app.icon {
             alert.icon = appIcon
         }
@@ -1464,7 +1464,7 @@ public final class AutoHideManager {
 
         appendLog(
             .info,
-            "Refreshed macOS Accessibility permission registration — toggle AutoHide ON in System Settings.",
+            "Refreshed macOS Accessibility permission registration — toggle AutoHideAgent ON in System Settings.",
             technical: "tccutil reset Accessibility \(bundleID)"
         )
         refreshAccessibilityTrustStatus(promptIfNeeded: true)

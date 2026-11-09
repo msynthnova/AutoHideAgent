@@ -3,11 +3,11 @@ set -euo pipefail
 
 # Usage:
 #   ./bundle.sh            # Debug build & bundle
-#   ./bundle.sh release    # Optimized Release build, bundle, and dist/AutoHide-macOS-v1.0.0.zip
+#   ./bundle.sh release    # Optimized Release build, bundle, and dist/AutoHideAgent-macOS-v1.0.0.zip
 
 MODE="${1:-debug}"
 PROJECT_DIR="/Users/flx/local/code/AutoHideAgent"
-APP_BUNDLE="$PROJECT_DIR/build/AutoHide.app"
+APP_BUNDLE="$PROJECT_DIR/build/AutoHideAgent.app"
 CONTENTS_DIR="$APP_BUNDLE/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
@@ -21,18 +21,17 @@ EXECUTABLE="$BIN_PATH/AutoHideAgent"
 
 echo "==> Stopping any running AutoHideAgent instance..."
 pkill -x AutoHideAgent || true
-pkill -x AutoHide || true
 sleep 0.4
 
 echo "==> Packaging $APP_BUNDLE..."
 rm -rf "$APP_BUNDLE"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
-cp "$EXECUTABLE" "$MACOS_DIR/AutoHide"
+cp "$EXECUTABLE" "$MACOS_DIR/AutoHideAgent"
 if [[ -f "$PROJECT_DIR/AppIcon.icns" ]]; then
     cp "$PROJECT_DIR/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 fi
-sed 's/\$(EXECUTABLE_NAME)/AutoHide/g' "$PROJECT_DIR/Info.plist" > "$CONTENTS_DIR/Info.plist"
+sed 's/\$(EXECUTABLE_NAME)/AutoHideAgent/g' "$PROJECT_DIR/Info.plist" > "$CONTENTS_DIR/Info.plist"
 echo -n "APPL????" > "$CONTENTS_DIR/PkgInfo"
 
 # Prefer a real Apple Development identity from Keychain so macOS Accessibility (TCC)
@@ -49,7 +48,7 @@ codesign --force --deep --sign "$SIGN_IDENTITY" --entitlements "$PROJECT_DIR/Aut
 
 if [[ "$MODE" == "release" ]]; then
     mkdir -p "$DIST_DIR"
-    ZIP_PATH="$DIST_DIR/AutoHide-macOS-v1.0.0.zip"
+    ZIP_PATH="$DIST_DIR/AutoHideAgent-macOS-v1.0.0.zip"
     rm -f "$ZIP_PATH"
     echo "==> Creating Release archive at $ZIP_PATH..."
     ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$ZIP_PATH"
