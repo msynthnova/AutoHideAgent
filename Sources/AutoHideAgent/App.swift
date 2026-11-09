@@ -122,6 +122,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
                 }
             }
         }
+
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.example.AutoHideAgent.debugCheckUpdates"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            MainActor.assumeIsolated {
+                UpdateController.shared.checkForUpdates()
+            }
+        }
     }
 
     /// Re-opens the main desktop window when the user clicks the Dock icon if the window was closed.
@@ -249,6 +259,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         openLogItem.target = self
         appMenu.addItem(openLogItem)
 
+        let checkForUpdatesItem = NSMenuItem(
+            title: "Check for Updates…",
+            action: #selector(checkForUpdatesFromMenu(_:)),
+            keyEquivalent: ""
+        )
+        checkForUpdatesItem.target = self
+        appMenu.addItem(checkForUpdatesItem)
+
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide AutoHideAgent", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(.separator())
@@ -276,6 +294,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     @objc private func openLogFromMenu(_ sender: Any?) {
         autoHideManager.openDiagnosticLogFile()
+    }
+
+    @objc private func checkForUpdatesFromMenu(_ sender: Any?) {
+        UpdateController.shared.checkForUpdates()
     }
 
     // MARK: - Setup Control Center Floating Menu Panel (Native WindowServer Rim & Corner Mask)

@@ -10,6 +10,10 @@ xcuserdata/
 # macOS system files
 .DS_Store
 
+# Sparkle private signing key & tools
+.sparkle_priv.key
+tools/sparkle/
+
 # Keep release zip inside dist/ tracked so GitHub repo includes the release artifact
 !dist/
 !dist/*.zip

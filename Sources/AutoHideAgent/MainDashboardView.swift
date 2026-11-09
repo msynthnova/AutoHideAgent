@@ -9,6 +9,7 @@ import SwiftUI
 @MainActor
 public struct MainDashboardView: View {
     @Bindable var manager: AutoHideManager
+    @ObservedObject private var updateController = UpdateController.shared
 
     @State private var customInput: String = ""
     @State private var selectedSection: NavigationSection = .overview
@@ -499,6 +500,101 @@ public struct MainDashboardView: View {
                                 set: { manager.setLaunchAtLogin($0) }
                             )
                         )
+                    }
+                }
+            }
+
+            // Software Updates & Homebrew Cask Group
+            VStack(alignment: .leading, spacing: 6) {
+                sectionGroupTitle("Software Updates & Distribution")
+
+                settingsGroupBox {
+                    VStack(alignment: .leading, spacing: 0) {
+                        // Sparkle In-App Auto-Updates Toggle
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Automatically Check for Updates")
+                                    .font(.system(size: 13, weight: .medium))
+                                Text("Checks for new releases in the background using Sparkle.")
+                                    .font(.system(size: 11.5))
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Toggle("", isOn: $updateController.automaticallyChecksForUpdates)
+                                .toggleStyle(.switch)
+                                .pointerStyle(.link)
+                                .labelsHidden()
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+
+                        Divider().padding(.horizontal, 14)
+
+                        // Manual Check Button + Version & Status
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Current Version: v1.0.0 (Build 2)")
+                                    .font(.system(size: 13, weight: .medium))
+                                Text("Last checked: \(updateController.friendlyLastCheckDate)")
+                                    .font(.system(size: 11.5))
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Button {
+                                updateController.checkForUpdates()
+                            } label: {
+                                Label("Check for Updates…", systemImage: "arrow.triangle.2.circlepath")
+                                    .font(.system(size: 12, weight: .medium))
+                            }
+                            .buttonStyle(.bordered)
+                            .pointerStyle(.link)
+                            .controlSize(.regular)
+                            .disabled(!updateController.canCheckForUpdates)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+
+                        Divider().padding(.horizontal, 14)
+
+                        // Homebrew Cask Support Row
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    Text("Homebrew Cask Support")
+                                        .font(.system(size: 13, weight: .medium))
+                                    Text("CLI")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 1.5)
+                                        .background(Capsule().fill(Color.primary.opacity(0.08)))
+                                }
+                                Text("Install or upgrade via terminal: brew install --cask autohideagent")
+                                    .font(.system(size: 11.5, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Button {
+                                let pb = NSPasteboard.general
+                                pb.clearContents()
+                                pb.setString("brew install --cask msynthnova/tap/autohideagent", forType: .string)
+                            } label: {
+                                Label("Copy Command", systemImage: "doc.on.doc")
+                                    .font(.system(size: 12, weight: .medium))
+                            }
+                            .buttonStyle(.bordered)
+                            .pointerStyle(.link)
+                            .controlSize(.regular)
+                            .help("Copy Homebrew installation command to clipboard")
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
                     }
                 }
             }

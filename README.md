@@ -4,16 +4,44 @@
 
 ---
 
-## Download & Release Package
+## Installation & Updates
 
-A pre-built, signed Release `.app` archive is included directly in this repository:
+AutoHideAgent supports two native update distribution channels: **Homebrew Cask** (CLI) and **Sparkle 2** (in-app updates).
+
+### Method A: Homebrew Cask (Recommended for CLI & Developers)
+
+Install directly via the custom tap:
+```bash
+# Add the tap and install AutoHideAgent
+brew tap msynthnova/tap
+brew install --cask autohideagent
+
+# Or single-command install:
+brew install --cask msynthnova/tap/autohideagent
+
+# Update anytime via Homebrew:
+brew upgrade --cask autohideagent
+```
+
+### Method B: In-App Updates via Sparkle 2
+
+- AutoHideAgent embeds **Sparkle 2** with EdDSA (ed25519) cryptographic signature verification.
+- **Automatic Checks:** Toggle "Automatically Check for Updates" in **General Settings**. AutoHideAgent checks for new versions once daily.
+- **Manual Check:** Click **"Check for Updates…"** in:
+  1. The macOS Application Menu (`AutoHideAgent` → `Check for Updates…`)
+  2. The Control Center menu bar popover footer
+  3. The **General Settings** tab in the main desktop window
+- Feed URL: `https://raw.githubusercontent.com/msynthnova/AutoHideAgent/main/appcast.xml`
+
+### Method C: Manual ZIP Download
+
 - **Release Archive:** [`dist/AutoHideAgent-macOS-v1.0.0.zip`](./dist/AutoHideAgent-macOS-v1.0.0.zip)
 - **SHA-256 Checksum:** [`dist/AutoHideAgent-macOS-v1.0.0.zip.sha256`](./dist/AutoHideAgent-macOS-v1.0.0.zip.sha256)
+- **Appcast Feed:** [`appcast.xml`](./appcast.xml)
 
-### Quick Installation from ZIP
 1. Extract `dist/AutoHideAgent-macOS-v1.0.0.zip`.
-2. Drag `AutoHideAgent.app` into `/Applications`.
-3. Open `AutoHideAgent.app` and click **Grant Access** when prompted for Accessibility permissions (required by macOS WindowServer so background agents can hide other applications).
+2. Move `AutoHideAgent.app` to `/Applications`.
+3. Open `AutoHideAgent.app` and grant Accessibility permissions when prompted.
 
 ---
 
@@ -64,24 +92,26 @@ A pre-built, signed Release `.app` archive is included directly in this reposito
 
 ```text
 AutoHideAgent/
-├── Package.swift                             # Swift 6 Package manifest (executable + test target)
-├── Info.plist                                # macOS App bundle metadata
+├── Package.swift                             # Swift 6 Package manifest (Sparkle 2 + test target)
+├── Info.plist                                # macOS App bundle metadata (Sparkle SUFeedURL + EdDSA key)
 ├── AutoHideAgent.entitlements                # Unsandboxed entitlement definition
 ├── AppIcon.icns                              # Vector-rendered macOS squircle iconset
-├── generate_icon.swift                       # CoreGraphics vector icon generator script
-├── bundle.sh                                 # Debug/Release build, .app packager, signer & ZIP archiver
+├── appcast.xml                               # Sparkle 2 RSS update feed with EdDSA signatures
+├── Casks/
+│   └── autohideagent.rb                      # Homebrew Cask formula
+├── bundle.sh                                 # Build, package, Sparkle sign & Homebrew sync script
 ├── dist/
 │   ├── AutoHideAgent-macOS-v1.0.0.zip        # Signed Release .app archive
-│   └── AutoHideAgent-macOS-v1.0.0.zip.sha256 # SHA-256 checksum
-├── README.md                                 # Comprehensive user & architecture documentation
-├── AGENTS.md                                 # AI Coding Agent instructions (Codex, ChatGPT, Cursor, etc.)
-├── CLAUDE.md                                 # Claude Code entry point
+│   ├── AutoHideAgent-macOS-v1.0.0.zip.sha256 # SHA-256 checksum
+│   └── appcast.xml                           # Dist appcast feed
+├── README.md                                 # Comprehensive documentation
 ├── Sources/
 │   └── AutoHideAgent/
 │       ├── App.swift                         # @main AppDelegate, NSWindow, NSMenu, NSStatusItem & NSPopover
 │       ├── AutoHideManager.swift             # Core @MainActor @Observable engine, timers, HID/IOKit/AX bridges
+│       ├── UpdateController.swift            # Sparkle 2 standard updater controller & SwiftUI bindings
 │       ├── MainDashboardView.swift           # Proportional macOS desktop window (NavigationSplitView)
-│       └── MenuPopoverView.swift             # 320pt menu bar popover
+│       └── MenuPopoverView.swift             # 308pt Control Center menu bar popover
 └── Tests/
     └── AutoHideAgentTests/
         └── AutoHideAgentTests.swift          # Swift Testing (@Test) suite (9 unit tests)

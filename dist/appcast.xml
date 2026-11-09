@@ -1,0 +1,15 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>AutoHideAgent</title>
+        <item>
+            <title>1.0.0</title>
+            <pubDate>Mon, 09 Nov 2026 03:56:28 -0600</pubDate>
+            <sparkle:version>2</sparkle:version>
+            <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.0.0/AutoHideAgent-macOS-v1.0.0.zip" length="1816979" type="application/octet-stream" sparkle:edSignature="aRZ9svjtv6rP2bJ2Q1OHroMpJcayf746LelHent2qDsTvUn2MWrqvmNdxFD7217a4s0mIrc5+98zTNEEtbvpAg=="/>
+        </item>
+    </channel>
+</rss>

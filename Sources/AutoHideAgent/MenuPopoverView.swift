@@ -152,6 +152,14 @@ public struct MenuPopoverView: View {
                 }
 
                 footerMenuLinkRow(
+                    id: "footer.checkUpdates",
+                    title: "Check for Updates…"
+                ) {
+                    onClosePanel?()
+                    UpdateController.shared.checkForUpdates()
+                }
+
+                footerMenuLinkRow(
                     id: "footer.openLog",
                     title: "Open Diagnostic Log…"
                 ) {

@@ -4,14 +4,20 @@ import PackageDescription
 let package = Package(
     name: "AutoHideAgent",
     platforms: [
-        .macOS("26.0")
+        .macOS(.v15)
     ],
     products: [
         .executable(name: "AutoHideAgent", targets: ["AutoHideAgent"])
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.10.0")
+    ],
     targets: [
         .executableTarget(
             name: "AutoHideAgent",
+            dependencies: [
+                .product(name: "Sparkle", package: "Sparkle")
+            ],
             path: "Sources/AutoHideAgent",
             swiftSettings: [
                 .swiftLanguageMode(.v6)
