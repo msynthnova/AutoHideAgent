@@ -13,7 +13,7 @@ MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 FRAMEWORKS_DIR="$CONTENTS_DIR/Frameworks"
 DIST_DIR="$PROJECT_DIR/dist"
-APP_VERSION="${2:-$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PROJECT_DIR/Info.plist" 2>/dev/null || echo "1.0.0")}"
+APP_VERSION="${2:-$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PROJECT_DIR/Info.plist" 2>/dev/null || echo "1.1.0")}"
 
 echo "==> Building AutoHideAgent (Swift 6, configuration: $MODE)..."
 swift build --package-path "$PROJECT_DIR" -c "$MODE"
