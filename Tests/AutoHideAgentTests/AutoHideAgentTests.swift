@@ -90,7 +90,7 @@ struct AutoHideAgentTests {
         manager.togglePauseForOneHour()
         #expect(manager.isTemporarilyPaused == true)
         #expect(manager.pausedUntilDate != nil)
-        #expect(manager.activityLogs.first?.userFriendlyMessage.contains("Paused AutoHide for 1 hour") == true)
+        #expect(manager.activityLogs.first?.userFriendlyMessage.contains("Paused AutoHideAgent for 1 hour") == true)
 
         manager.resumeFromTemporaryPause()
         #expect(manager.isTemporarilyPaused == false)
@@ -145,9 +145,12 @@ struct AutoHideAgentTests {
     @Test("Dock and Menu Bar presence options toggle and prevent hiding both simultaneously")
     func testDockAndMenuBarPresenceOptions() {
         let manager = AutoHideManager()
+        let originalDock = manager.showInDock
+        let originalMenuBar = manager.showInMenuBar
         defer {
             manager.showInDock = true
-            manager.showInMenuBar = true
+            manager.showInMenuBar = originalMenuBar
+            manager.showInDock = originalDock
         }
 
         manager.showInDock = true

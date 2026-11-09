@@ -357,7 +357,7 @@ public final class AutoHideManager {
             Keys.keepPreviousAppVisible: false,
             Keys.protectActiveMediaApps: true,
             Keys.showInDock: true,
-            Keys.showInMenuBar: true,
+            Keys.showInMenuBar: false,
             Keys.whitelistedItems: [
                 "com.apple.finder"
             ]
