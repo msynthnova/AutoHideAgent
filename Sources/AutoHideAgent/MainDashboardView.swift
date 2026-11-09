@@ -34,7 +34,7 @@ public struct MainDashboardView: View {
         }
     }
 
-    private let uiRefreshTimer = Timer.publish(every: 5.0, tolerance: 1.0, on: .main, in: .common).autoconnect()
+    private let uiRefreshTimer = Timer.publish(every: 10.0, tolerance: 2.0, on: .main, in: .common).autoconnect()
 
     public init(manager: AutoHideManager) {
         self.manager = manager
@@ -627,8 +627,8 @@ public struct MainDashboardView: View {
     }
 
     private var currentAppVersionDisplay: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.1.0"
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "3"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.2.0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "4"
         return "v\(version) (Build \(build))"
     }
 
