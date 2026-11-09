@@ -61,6 +61,16 @@ public struct MainDashboardView: View {
                 manager.refreshRunningApps()
             }
         }
+        .onReceive(
+            DistributedNotificationCenter.default().publisher(
+                for: NSNotification.Name("com.example.AutoHideAgent.debugSelectSection")
+            )
+        ) { notification in
+            if let raw = notification.object as? String,
+               let section = NavigationSection(rawValue: raw) {
+                selectedSection = section
+            }
+        }
         .onChange(of: selectedSection) { _, _ in
             manager.refreshRunningApps()
             manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
@@ -70,12 +80,13 @@ public struct MainDashboardView: View {
     // MARK: - 1. Native macOS System Settings Sidebar
 
     private var sidebarView: some View {
-        List(NavigationSection.allCases, selection: $selectedSection) { section in
-            NavigationLink(value: section) {
+        List(selection: $selectedSection) {
+            ForEach(NavigationSection.allCases) { section in
                 Label(section.rawValue, systemImage: section.icon)
                     .font(.system(size: 13))
+                    .badge(badgeCount(for: section))
+                    .tag(section)
             }
-            .badge(badgeCount(for: section))
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) {
