@@ -439,6 +439,7 @@ public final class AutoHideManager {
 
     /// Immediately hides all currently visible, non-whitelisted background `.regular` applications.
     public func hideAllBackgroundAppsNow() {
+        guard checkAccessibilityPermissions(promptIfNeeded: false) else { return }
         refreshAccessibilityTrustStatus(promptIfNeeded: false)
         let frontmostApp = NSWorkspace.shared.frontmostApplication
         let myPID = ProcessInfo.processInfo.processIdentifier
@@ -1080,7 +1081,7 @@ public final class AutoHideManager {
     /// that have exceeded their configured inactivity thresholds while the user is actively
     /// interacting with the system.
     public func evaluateAndHideInactiveApps() {
-        guard isEnabled else { return }
+        guard isEnabled, isAccessibilityTrusted else { return }
         guard isAutoHideEnabled || isAutoQuitEnabled else { return }
 
         // Check if "Pause for 1 Hour" snooze has expired or is still active

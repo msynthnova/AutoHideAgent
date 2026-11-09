@@ -40,6 +40,86 @@ public struct MainDashboardView: View {
     }
 
     public var body: some View {
+        Group {
+            if manager.isAccessibilityTrusted {
+                mainContent
+            } else {
+                accessibilitySetupGate
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: manager.isAccessibilityTrusted)
+        .onAppear { manager.refreshAccessibilityTrustStatus(promptIfNeeded: false) }
+    }
+
+    // MARK: - First-Run Accessibility Gate (must grant before using the app)
+
+    private var accessibilitySetupGate: some View {
+        VStack(spacing: 18) {
+            Spacer(minLength: 0)
+            if let appIcon = NSApplication.shared.applicationIconImage {
+                Image(nsImage: appIcon).resizable().frame(width: 84, height: 84)
+            }
+            Text("Welcome to AutoHide")
+                .font(.system(size: 24, weight: .bold))
+            Text("AutoHide needs Accessibility access so macOS lets it hide and manage other apps' windows. It never reads your screen or keystrokes.")
+                .font(.system(size: 13.5))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 440)
+
+            VStack(alignment: .leading, spacing: 10) {
+                setupStep(1, "Click \"Grant Access…\" below to open System Settings.")
+                setupStep(2, "Go to Privacy & Security → Accessibility.")
+                setupStep(3, "Turn the switch next to AutoHide ON.")
+            }
+            .padding(14)
+            .frame(maxWidth: 440, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
+
+            HStack(spacing: 10) {
+                Button("Grant Access…") {
+                    manager.refreshAccessibilityTrustStatus(promptIfNeeded: true)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .pointerStyle(.link)
+
+                Button("Reset & Retry") {
+                    manager.resetAndPromptAccessibilityPermission()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .pointerStyle(.link)
+                .help("Use this if AutoHide is already switched on in System Settings but still isn't detected")
+            }
+
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Waiting for permission — this screen closes automatically once it's granted.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .frame(minWidth: 560, minHeight: 520)
+    }
+
+    private func setupStep(_ n: Int, _ text: String) -> some View {
+        HStack(spacing: 10) {
+            Text("\(n)")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 20, height: 20)
+                .background(Circle().fill(Color.accentColor))
+            Text(text).font(.system(size: 13))
+        }
+    }
+
+    private var mainContent: some View {
         NavigationSplitView {
             sidebarView
                 .navigationSplitViewColumnWidth(min: 195, ideal: 205, max: 225)

@@ -53,6 +53,54 @@ public struct MenuPopoverView: View {
     }
 
     public var body: some View {
+        Group {
+            if manager.isAccessibilityTrusted {
+                fullPanelContent
+            } else {
+                setupRequiredPanel
+            }
+        }
+        .frame(width: 308)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(
+            ZStack {
+                ControlCenterVisualEffectBackground()
+                Color(nsColor: .windowBackgroundColor).opacity(0.32)
+            }
+        )
+        .ignoresSafeArea()
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in
+            if h > 50 { onHeightChange?(h) }
+        }
+    }
+
+    private var setupRequiredPanel: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 26))
+                .foregroundStyle(.orange)
+            Text("Setup Required")
+                .font(.system(size: 14, weight: .semibold))
+            Text("Grant Accessibility access to start using AutoHide.")
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Open AutoHide to Set Up") {
+                onClosePanel?()
+                onOpenMainWindow?()
+            }
+            .buttonStyle(.borderedProminent)
+            .pointerStyle(.link)
+            Button("Quit AutoHide") { NSApplication.shared.terminate(nil) }
+                .buttonStyle(.plain)
+                .pointerStyle(.link)
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+    }
+
+    private var fullPanelContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             // 1. Header ("AutoHide" + Master Switch)
             headerBar
@@ -121,24 +169,6 @@ public struct MenuPopoverView: View {
             }
             .padding(.horizontal, 6)
             .padding(.vertical, 6)
-        }
-        .frame(width: 308)
-        .fixedSize(horizontal: false, vertical: true)
-        .background(
-            ZStack {
-                ControlCenterVisualEffectBackground()
-                // Subtle neutral surface tint so saturated colors behind the window diffuse smoothly like Apple's Sound panel
-                Color(nsColor: .windowBackgroundColor)
-                    .opacity(0.32)
-            }
-        )
-        .ignoresSafeArea()
-        .onGeometryChange(for: CGFloat.self) { proxy in
-            proxy.size.height
-        } action: { newHeight in
-            if newHeight > 50 {
-                onHeightChange?(newHeight)
-            }
         }
         .onReceive(
             DistributedNotificationCenter.default().publisher(
