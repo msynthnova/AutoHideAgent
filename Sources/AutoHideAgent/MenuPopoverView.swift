@@ -178,6 +178,7 @@ public struct MenuPopoverView: View {
 
             Toggle("", isOn: $manager.isEnabled)
                 .toggleStyle(.switch)
+                .pointerStyle(.link)
                 .controlSize(.small)
                 .labelsHidden()
         }
@@ -430,6 +431,7 @@ public struct MenuPopoverView: View {
                 }
             }
             .buttonStyle(.plain)
+            .pointerStyle(.link)
 
             // Main Row Area (toggles action or expands submenu)
             Button(action: onRowTap) {
@@ -458,6 +460,7 @@ public struct MenuPopoverView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .pointerStyle(.link)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5.5)
@@ -510,6 +513,7 @@ public struct MenuPopoverView: View {
             .padding(.horizontal, 6)
         }
         .buttonStyle(.plain)
+        .pointerStyle(.link)
         .onHover { hovering in
             hoveredRowID = hovering ? id : (hoveredRowID == id ? nil : hoveredRowID)
         }
@@ -547,6 +551,7 @@ public struct MenuPopoverView: View {
             )
         }
         .buttonStyle(.plain)
+        .pointerStyle(.link)
         .onHover { hovering in
             hoveredRowID = hovering ? id : (hoveredRowID == id ? nil : hoveredRowID)
         }

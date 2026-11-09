@@ -86,6 +86,7 @@ public struct MainDashboardView: View {
                     .font(.system(size: 13))
                     .badge(badgeCount(for: section))
                     .tag(section)
+                    .pointerStyle(.link)
             }
         }
         .listStyle(.sidebar)
@@ -193,6 +194,7 @@ public struct MainDashboardView: View {
 
                         Toggle("", isOn: $manager.isEnabled)
                             .toggleStyle(.switch)
+                            .pointerStyle(.link)
                             .labelsHidden()
                     }
                     .padding(.horizontal, 14)
@@ -230,6 +232,7 @@ public struct MainDashboardView: View {
                                 .font(.system(size: 12, weight: .medium))
                             }
                             .buttonStyle(.bordered)
+                            .pointerStyle(.link)
                             .controlSize(.regular)
                             .disabled(!manager.isEnabled)
 
@@ -245,6 +248,7 @@ public struct MainDashboardView: View {
                                 .font(.system(size: 12, weight: .medium))
                             }
                             .buttonStyle(.borderedProminent)
+                            .pointerStyle(.link)
                             .controlSize(.regular)
                         }
                         .fixedSize(horizontal: true, vertical: false)
@@ -286,6 +290,7 @@ public struct MainDashboardView: View {
 
                             Toggle("", isOn: $manager.isAutoHideEnabled)
                                 .toggleStyle(.switch)
+                                .pointerStyle(.link)
                                 .labelsHidden()
                                 .disabled(!manager.isEnabled)
                         }
@@ -317,6 +322,7 @@ public struct MainDashboardView: View {
 
                             Toggle("", isOn: $manager.isAutoQuitEnabled)
                                 .toggleStyle(.switch)
+                                .pointerStyle(.link)
                                 .labelsHidden()
                                 .disabled(!manager.isEnabled)
                         }
@@ -461,6 +467,7 @@ public struct MainDashboardView: View {
                             manager.resetAndPromptAccessibilityPermission()
                         }
                         .buttonStyle(.bordered)
+                        .pointerStyle(.link)
                         .controlSize(.regular)
                         .help("Clears stale macOS permission cache from older builds and prompts freshly")
 
@@ -468,6 +475,7 @@ public struct MainDashboardView: View {
                             manager.refreshAccessibilityTrustStatus(promptIfNeeded: true)
                         }
                         .buttonStyle(.borderedProminent)
+                        .pointerStyle(.link)
                         .tint(.orange)
                         .controlSize(.regular)
                     }
@@ -512,6 +520,7 @@ public struct MainDashboardView: View {
                         .font(.system(size: 12, weight: .medium))
                 }
                 .buttonStyle(.borderedProminent)
+                .pointerStyle(.link)
                 .controlSize(.regular)
             }
 
@@ -591,6 +600,7 @@ public struct MainDashboardView: View {
                 }
             }
             .buttonStyle(.bordered)
+            .pointerStyle(.link)
             .controlSize(.small)
 
             if !app.isHidden {
@@ -598,6 +608,7 @@ public struct MainDashboardView: View {
                     manager.manuallyHideApp(app)
                 }
                 .buttonStyle(.bordered)
+                .pointerStyle(.link)
                 .controlSize(.small)
             }
 
@@ -605,6 +616,7 @@ public struct MainDashboardView: View {
                 manager.manuallyQuitApp(app)
             }
             .buttonStyle(.bordered)
+            .pointerStyle(.link)
             .controlSize(.small)
         }
         .padding(.horizontal, 14)
@@ -655,6 +667,7 @@ public struct MainDashboardView: View {
                     addCustomExclusion()
                 }
                 .buttonStyle(.borderedProminent)
+                .pointerStyle(.link)
                 .disabled(customInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
 
@@ -679,6 +692,7 @@ public struct MainDashboardView: View {
                                         manager.removeWhitelistEntry(item)
                                     }
                                     .buttonStyle(.bordered)
+                                    .pointerStyle(.link)
                                     .controlSize(.small)
                                 } else {
                                     Text("System Default")
@@ -725,18 +739,21 @@ public struct MainDashboardView: View {
                     manager.openDiagnosticLogFile()
                 }
                 .buttonStyle(.bordered)
+                .pointerStyle(.link)
                 .controlSize(.small)
 
                 Button("Reveal in Finder") {
                     manager.revealDiagnosticLogInFinder()
                 }
                 .buttonStyle(.bordered)
+                .pointerStyle(.link)
                 .controlSize(.small)
 
                 Button("Clear") {
                     manager.clearLogs()
                 }
                 .buttonStyle(.bordered)
+                .pointerStyle(.link)
                 .controlSize(.small)
                 .disabled(manager.activityLogs.isEmpty)
             }
@@ -839,6 +856,7 @@ public struct MainDashboardView: View {
 
             Toggle("", isOn: isOn)
                 .toggleStyle(.switch)
+                .pointerStyle(.link)
                 .labelsHidden()
                 .disabled(disabled)
         }

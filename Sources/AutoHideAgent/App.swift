@@ -347,7 +347,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private func setStatusButtonHighlighted(_ highlighted: Bool) {
         guard let button = statusItem?.button else { return }
         button.wantsLayer = true
-        button.layer?.cornerRadius = 5.5
+        button.layer?.cornerRadius = max(button.bounds.height, 22) / 2
         button.layer?.cornerCurve = .continuous
         button.layer?.backgroundColor = highlighted
             ? NSColor.labelColor.withAlphaComponent(0.18).cgColor
