@@ -6,7 +6,7 @@ set -euo pipefail
 #   ./bundle.sh release    # Optimized Release build, bundle, Sparkle sign & appcast, and Homebrew cask update
 
 MODE="${1:-debug}"
-PROJECT_DIR="/Users/flx/local/code/AutoHideAgent"
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_BUNDLE="$PROJECT_DIR/build/AutoHideAgent.app"
 CONTENTS_DIR="$APP_BUNDLE/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
@@ -50,14 +50,30 @@ else
     echo "WARNING: Sparkle.framework not found in .build directory!"
 fi
 
-# Prefer real Apple Development identity from Keychain so Accessibility (TCC)
-# permission persists across rebuilds instead of breaking on ad-hoc cdhash changes.
-SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Apple Development:[^"]*\)".*/\1/p' | head -n 1)
-if [[ -z "$SIGN_IDENTITY" ]]; then
-    SIGN_IDENTITY="-"
-    echo "==> Signing $APP_BUNDLE with ad-hoc signature..."
+if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
+    SIGN_IDENTITY="$CODESIGN_IDENTITY"
+    echo "==> Signing $APP_BUNDLE with specified identity '$SIGN_IDENTITY'..."
+elif [[ "$MODE" == "release" ]]; then
+    # For public release distribution, prefer Developer ID Application if available.
+    # Otherwise default to ad-hoc ("-") so personal real names, Apple IDs, and
+    # development team IDs are not embedded in public release archives.
+    SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' | head -n 1)
+    if [[ -z "$SIGN_IDENTITY" ]]; then
+        SIGN_IDENTITY="-"
+        echo "==> Signing Release $APP_BUNDLE with clean ad-hoc signature..."
+    else
+        echo "==> Signing Release $APP_BUNDLE with '$SIGN_IDENTITY'..."
+    fi
 else
-    echo "==> Signing $APP_BUNDLE with '$SIGN_IDENTITY'..."
+    # For local debug builds, prefer a local Apple Development identity so macOS Accessibility
+    # (TCC) permission persists across rebuilds during development.
+    SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Apple Development:[^"]*\)".*/\1/p' | head -n 1)
+    if [[ -z "$SIGN_IDENTITY" ]]; then
+        SIGN_IDENTITY="-"
+        echo "==> Signing Debug $APP_BUNDLE with ad-hoc signature..."
+    else
+        echo "==> Signing Debug $APP_BUNDLE with '$SIGN_IDENTITY'..."
+    fi
 fi
 
 # Sign Sparkle inner components first, then framework, then outer app
