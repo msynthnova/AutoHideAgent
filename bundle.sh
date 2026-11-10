@@ -3,30 +3,38 @@ set -euo pipefail
 
 # Usage:
 #   ./bundle.sh            # Debug build & bundle
-#   ./bundle.sh release    # Optimized Release build, bundle, Sparkle sign & appcast, and Homebrew cask update
+#   ./bundle.sh release    # Optimized Release build, Developer ID sign with Hardened Runtime,
+#                          # Apple Notarization & Stapling, Sparkle sign & appcast, and Homebrew cask update
 
 MODE="${1:-debug}"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
-if [[ -z "${SDKROOT:-}" || ! -d "${SDKROOT:-}" ]]; then
+
+# Ensure SDKROOT points to a valid directory to prevent xcrun/swift failures
+if [[ -n "${SDKROOT:-}" && ! -d "$SDKROOT" ]]; then
+    unset SDKROOT
+fi
+if [[ -z "${SDKROOT:-}" ]]; then
     export SDKROOT="$(xcrun -sdk macosx --show-sdk-path 2>/dev/null || true)"
 fi
+
 APP_BUNDLE="$PROJECT_DIR/build/AutoHideAgent.app"
 CONTENTS_DIR="$APP_BUNDLE/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 FRAMEWORKS_DIR="$CONTENTS_DIR/Frameworks"
 DIST_DIR="$PROJECT_DIR/dist"
-APP_VERSION="${2:-$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PROJECT_DIR/Info.plist" 2>/dev/null || echo "1.3.0")}"
+APP_VERSION="${2:-$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PROJECT_DIR/Info.plist" 2>/dev/null || echo "1.4.0")}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-notarytool-profile}"
 
-echo "==> Building AutoHideAgent (Swift 6, configuration: $MODE)..."
+echo "==> Building AutoHideAgent (Swift 6, configuration: $MODE, version: $APP_VERSION)..."
 swift build --package-path "$PROJECT_DIR" -c "$MODE"
 
 BIN_PATH=$(swift build --package-path "$PROJECT_DIR" -c "$MODE" --show-bin-path)
 EXECUTABLE="$BIN_PATH/AutoHideAgent"
 
-echo "==> Stopping any running AutoHideAgent instance..."
-pkill -x AutoHideAgent || true
-sleep 0.4
+echo "==> Stopping any local build instance of AutoHideAgent..."
+pkill -f "$APP_BUNDLE/Contents/MacOS/AutoHideAgent" 2>/dev/null || true
+sleep 0.3
 
 echo "==> Packaging $APP_BUNDLE..."
 rm -rf "$APP_BUNDLE"
@@ -61,19 +69,14 @@ if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
     SIGN_IDENTITY="$CODESIGN_IDENTITY"
     echo "==> Signing $APP_BUNDLE with specified identity '$SIGN_IDENTITY'..."
 elif [[ "$MODE" == "release" ]]; then
-    # For public release distribution, prefer Developer ID Application if available.
-    # Otherwise default to ad-hoc ("-") so personal real names, Apple IDs, and
-    # development team IDs are not embedded in public release archives.
     SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' | head -n 1)
     if [[ -z "$SIGN_IDENTITY" ]]; then
         SIGN_IDENTITY="-"
-        echo "==> Signing Release $APP_BUNDLE with clean ad-hoc signature..."
+        echo "==> WARNING: Developer ID Application certificate not found. Signing with ad-hoc signature..."
     else
-        echo "==> Signing Release $APP_BUNDLE with '$SIGN_IDENTITY'..."
+        echo "==> Signing Release $APP_BUNDLE with Developer ID: '$SIGN_IDENTITY'..."
     fi
 else
-    # For local debug builds, prefer a local Apple Development identity so macOS Accessibility
-    # (TCC) permission persists across rebuilds during development.
     SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Apple Development:[^"]*\)".*/\1/p' | head -n 1)
     if [[ -z "$SIGN_IDENTITY" ]]; then
         SIGN_IDENTITY="-"
@@ -83,22 +86,78 @@ else
     fi
 fi
 
-# Sign Sparkle inner components first, then framework, then outer app
-if [[ -d "$FRAMEWORKS_DIR/Sparkle.framework" ]]; then
-    codesign --force --sign "$SIGN_IDENTITY" "$FRAMEWORKS_DIR/Sparkle.framework/Versions/B/XPCServices/org.sparkle-project.InstallerConnection.xpc" 2>/dev/null || true
-    codesign --force --sign "$SIGN_IDENTITY" "$FRAMEWORKS_DIR/Sparkle.framework/Versions/B/XPCServices/org.sparkle-project.InstallerStatus.xpc" 2>/dev/null || true
-    codesign --force --sign "$SIGN_IDENTITY" "$FRAMEWORKS_DIR/Sparkle.framework/Versions/B/Autoupdate" 2>/dev/null || true
-    codesign --force --sign "$SIGN_IDENTITY" "$FRAMEWORKS_DIR/Sparkle.framework/Versions/B/Updater.app" 2>/dev/null || true
-    codesign --force --sign "$SIGN_IDENTITY" "$FRAMEWORKS_DIR/Sparkle.framework"
+# Codesign options
+CODESIGN_FLAGS=(--force)
+if [[ "$SIGN_IDENTITY" != "-" ]]; then
+    CODESIGN_FLAGS+=(--timestamp --options runtime)
 fi
 
-codesign --force --deep --sign "$SIGN_IDENTITY" --entitlements "$PROJECT_DIR/AutoHideAgent.entitlements" "$APP_BUNDLE"
+# Sign Sparkle inner components first, then framework, then outer app
+if [[ -d "$FRAMEWORKS_DIR/Sparkle.framework" ]]; then
+    echo "==> Signing Sparkle framework internal components..."
+    for xpc in "$FRAMEWORKS_DIR/Sparkle.framework/Versions/B/XPCServices/"*.xpc; do
+        if [[ -d "$xpc" ]]; then
+            codesign "${CODESIGN_FLAGS[@]}" --sign "$SIGN_IDENTITY" "$xpc"
+        fi
+    done
+    if [[ -f "$FRAMEWORKS_DIR/Sparkle.framework/Versions/B/Autoupdate" ]]; then
+        codesign "${CODESIGN_FLAGS[@]}" --sign "$SIGN_IDENTITY" "$FRAMEWORKS_DIR/Sparkle.framework/Versions/B/Autoupdate"
+    fi
+    if [[ -d "$FRAMEWORKS_DIR/Sparkle.framework/Versions/B/Updater.app" ]]; then
+        codesign "${CODESIGN_FLAGS[@]}" --sign "$SIGN_IDENTITY" "$FRAMEWORKS_DIR/Sparkle.framework/Versions/B/Updater.app"
+    fi
+    codesign "${CODESIGN_FLAGS[@]}" --sign "$SIGN_IDENTITY" "$FRAMEWORKS_DIR/Sparkle.framework"
+fi
+
+echo "==> Signing main executable and app bundle..."
+codesign "${CODESIGN_FLAGS[@]}" --sign "$SIGN_IDENTITY" "$MACOS_DIR/AutoHideAgent"
+codesign "${CODESIGN_FLAGS[@]}" --sign "$SIGN_IDENTITY" --entitlements "$PROJECT_DIR/AutoHideAgent.entitlements" "$APP_BUNDLE"
+
+echo "==> Verifying code signature..."
+codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 
 if [[ "$MODE" == "release" ]]; then
     mkdir -p "$DIST_DIR"
+
+    # Apple Notarization
+    if [[ "$SIGN_IDENTITY" == Developer\ ID\ Application:* ]]; then
+        echo "==> Checking Apple Notary Service credentials for profile '$NOTARY_PROFILE'..."
+        if xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
+            TEMP_NOTARY_ZIP="$DIST_DIR/AutoHideAgent-notarize.zip"
+            rm -f "$TEMP_NOTARY_ZIP"
+            echo "==> Packaging temporary archive for notarization submission..."
+            ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$TEMP_NOTARY_ZIP"
+
+            echo "==> Submitting to Apple Notary Service (waiting for response)..."
+            SUBMIT_OUTPUT=$(xcrun notarytool submit "$TEMP_NOTARY_ZIP" --keychain-profile "$NOTARY_PROFILE" --wait)
+            echo "$SUBMIT_OUTPUT"
+            rm -f "$TEMP_NOTARY_ZIP"
+
+            SUBMISSION_ID=$(echo "$SUBMIT_OUTPUT" | awk '/id:/ {print $2; exit}')
+            if echo "$SUBMIT_OUTPUT" | grep -q "status: Accepted"; then
+                echo "==> Apple Notarization SUCCESSFUL!"
+                echo "==> Stapling notarization ticket to $APP_BUNDLE..."
+                xcrun stapler staple "$APP_BUNDLE"
+                echo "==> Validating Gatekeeper assessment..."
+                spctl --assess --type execute --verbose "$APP_BUNDLE" || true
+            else
+                echo "==> ERROR: Apple Notarization was NOT accepted."
+                if [[ -n "$SUBMISSION_ID" ]]; then
+                    echo "==> Fetching notary log for submission $SUBMISSION_ID..."
+                    xcrun notarytool log "$SUBMISSION_ID" --keychain-profile "$NOTARY_PROFILE" || true
+                fi
+                exit 1
+            fi
+        else
+            echo "==> WARNING: Keychain profile '$NOTARY_PROFILE' not found or invalid. Skipping notarization."
+        fi
+    else
+        echo "==> Non-Developer-ID signature detected ('$SIGN_IDENTITY'). Skipping Apple Notarization."
+    fi
+
     ZIP_PATH="$DIST_DIR/AutoHideAgent-macOS-v${APP_VERSION}.zip"
     rm -f "$ZIP_PATH"
-    echo "==> Creating Release archive at $ZIP_PATH..."
+    echo "==> Creating final Release archive at $ZIP_PATH..."
     ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$ZIP_PATH"
     
     SHA256_VAL=$(shasum -a 256 "$ZIP_PATH" | awk '{print $1}')
@@ -178,4 +237,4 @@ EOF
     fi
 fi
 
-echo "==> Bundle ready at: $APP_BUNDLE"
+echo "==> Release packaging complete. Bundle ready at: $APP_BUNDLE"

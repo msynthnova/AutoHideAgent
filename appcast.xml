@@ -3,13 +3,25 @@
     <channel>
         <title>AutoHideAgent</title>
         <item>
+            <title>1.4.0</title>
+            <pubDate>Mon, 09 Nov 2026 21:53:26 -0600</pubDate>
+            <sparkle:version>6</sparkle:version>
+            <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.0/AutoHideAgent-macOS-v1.4.0.zip" length="1690613" type="application/octet-stream" sparkle:edSignature="R0QjOPvGzorVm6NVyJvBiZuA3kNYEVOuAp/PSdLTjjZlDk6PHVQuj2Kq78EsQrEzajsh81EXWJF3nWZ9909LAw=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.0/AutoHideAgent6-5.delta" sparkle:deltaFrom="5" length="19198" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="4Jz+ZWdPBbFuocdZ3q1ueHCksqGau/f58kvjF5z1JmO2kj8LPHiuZBmDVH/ujk3pxnzOUekN6BCbv4PoQXldAQ=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>1.3.0</title>
             <pubDate>Mon, 09 Nov 2026 20:56:32 -0600</pubDate>
             <sparkle:version>5</sparkle:version>
             <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.3.0/AutoHideAgent-macOS-v1.3.0.zip" length="1634750" type="application/octet-stream" sparkle:edSignature="I1kdEvesvgpSigIvHWdOxomP1Qzw7RAx6x6TgZ1pZxkFGyJNAPLifL19JaxwKbXIWEVnsVyKLLtIq95IZxXkDw=="/>
+            <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.0/AutoHideAgent-macOS-v1.3.0.zip" length="1634750" type="application/octet-stream" sparkle:edSignature="I1kdEvesvgpSigIvHWdOxomP1Qzw7RAx6x6TgZ1pZxkFGyJNAPLifL19JaxwKbXIWEVnsVyKLLtIq95IZxXkDw=="/>
         </item>
     </channel>
 </rss>
