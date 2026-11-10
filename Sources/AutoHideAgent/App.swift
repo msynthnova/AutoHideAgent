@@ -190,8 +190,34 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     // MARK: - Setup Main Desktop Window
 
+    private final class AutoHideDashboardWindow: NSWindow {
+        override func sendEvent(_ event: NSEvent) {
+            if event.type == .leftMouseDown && event.clickCount == 2 {
+                let loc = event.locationInWindow
+                let topBarHeight: CGFloat = 54
+                let isTopBar = loc.y >= frame.height - topBarHeight && loc.y <= frame.height
+                if isTopBar && loc.x > 75 {
+                    if let hit = contentView?.hitTest(loc) {
+                        let className = NSStringFromClass(type(of: hit))
+                        let isTableOrRow = className.contains("Table") || className.contains("Row") || className.contains("Cell")
+                        let isInteractive = hit is NSButton || hit is NSTextField || hit is NSControl ||
+                                            className.contains("Button") || className.contains("TextField") || isTableOrRow
+                        if !isInteractive {
+                            self.performZoom(nil)
+                            return
+                        }
+                    } else {
+                        self.performZoom(nil)
+                        return
+                    }
+                }
+            }
+            super.sendEvent(event)
+        }
+    }
+
     private func setupAndShowMainWindow() {
-        let window = NSWindow(
+        let window = AutoHideDashboardWindow(
             contentRect: NSRect(x: 0, y: 0, width: 960, height: 620),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,

@@ -464,6 +464,7 @@ public struct MenuPopoverView: View {
             )
         }
         .buttonStyle(.plain)
+        .pointerStyle(.link)
         .onHover { hovering in
             hoveredRowID = hovering ? "autoquit.confirm" : (hoveredRowID == "autoquit.confirm" ? nil : hoveredRowID)
         }
@@ -638,6 +639,7 @@ public struct MenuPopoverView: View {
             )
         }
         .buttonStyle(.plain)
+        .pointerStyle(.link)
         .onHover { hovering in
             hoveredRowID = hovering ? id : (hoveredRowID == id ? nil : hoveredRowID)
         }

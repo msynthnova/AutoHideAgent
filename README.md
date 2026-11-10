@@ -31,11 +31,11 @@ brew upgrade --cask --greedy autohideagent
 
 ### Method C: Manual ZIP Download
 
-- **Release Archive:** [`dist/AutoHideAgent-macOS-v1.4.2.zip`](./dist/AutoHideAgent-macOS-v1.4.2.zip)
-- **SHA-256 Checksum:** [`dist/AutoHideAgent-macOS-v1.4.2.zip.sha256`](./dist/AutoHideAgent-macOS-v1.4.2.zip.sha256)
+- **Release Archive:** [`dist/AutoHideAgent-macOS-v1.4.3.zip`](./dist/AutoHideAgent-macOS-v1.4.3.zip)
+- **SHA-256 Checksum:** [`dist/AutoHideAgent-macOS-v1.4.3.zip.sha256`](./dist/AutoHideAgent-macOS-v1.4.3.zip.sha256)
 - **Appcast Feed:** [`appcast.xml`](./appcast.xml)
 
-1. Extract `dist/AutoHideAgent-macOS-v1.4.2.zip`.
+1. Extract `dist/AutoHideAgent-macOS-v1.4.3.zip`.
 2. Move `AutoHideAgent.app` to `/Applications`.
 3. If macOS blocks opening on first launch ("Apple could not verify AutoHideAgent is free of malware"):
    - Click **Done**, open **System Settings → Privacy & Security**, scroll to **Security**, and click **Open Anyway**.
@@ -100,8 +100,8 @@ AutoHideAgent/
 │   └── autohideagent.rb                      # Homebrew Cask formula
 ├── bundle.sh                                 # Build, package, Sparkle sign & Homebrew sync script
 ├── dist/
-│   ├── AutoHideAgent-macOS-v1.4.2.zip        # Signed Release .app archive
-│   └── AutoHideAgent-macOS-v1.4.2.zip.sha256 # SHA-256 checksum
+│   ├── AutoHideAgent-macOS-v1.4.3.zip        # Signed Release .app archive
+│   └── AutoHideAgent-macOS-v1.4.3.zip.sha256 # SHA-256 checksum
 ├── README.md                                 # Comprehensive documentation
 ├── Sources/
 │   └── AutoHideAgent/
@@ -127,7 +127,7 @@ AutoHideAgent/
 # 1. Run the automated Swift Testing unit test suite
 swift test
 
-# 2. Build a Release .app bundle and generate dist/AutoHideAgent-macOS-v1.4.2.zip
+# 2. Build a Release .app bundle and generate dist/AutoHideAgent-macOS-v1.4.3.zip
 ./bundle.sh release
 
 # 3. Build a Debug .app bundle and launch it

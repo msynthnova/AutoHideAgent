@@ -3,18 +3,28 @@
     <channel>
         <title>AutoHideAgent</title>
         <item>
+            <title>1.4.3</title>
+            <pubDate>Tue, 10 Nov 2026 00:04:15 -0600</pubDate>
+            <sparkle:version>9</sparkle:version>
+            <sparkle:shortVersionString>1.4.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.3/AutoHideAgent-macOS-v1.4.3.zip" length="1709443" type="application/octet-stream" sparkle:edSignature="pNwzNmu3vyQF8LHukLjrvHN2ZGJEBkSQCAG1y1NJG8o69zasaJysX9Xc4L1KGH7RvZb5HBZySGKsVSH5CXQ4Bg=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.3/AutoHideAgent9-8.delta" sparkle:deltaFrom="8" length="88530" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="976432" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="BK5mJynyRzRhp+ANaGd31G64vR9Z2EbuoYwaC9+PgctOsbZfDO70hRQ4O7s9AJoTQlDTynfIGJ+nkutuL98XBg=="/>
+                <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.3/AutoHideAgent9-7.delta" sparkle:deltaFrom="7" length="125038" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="976432" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="hpzqcnvshIp4+cyGdRlgAmVIIaAPZXNeaa88u986Impry3fLWLqIjDYOpyzsjs9Kw0B8jobhsJuAq/VEqvL6Aw=="/>
+                <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.3/AutoHideAgent9-6.delta" sparkle:deltaFrom="6" length="138386" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="976432" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="YKBuLS3El/RJf1JIctyIkvMvPaKujBaaeHw81ExXy5pZc9Jdbkr/oACzselckq1eIQxN0RbE5SkXjy8bvrrYDA=="/>
+                <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.3/AutoHideAgent9-5.delta" sparkle:deltaFrom="5" length="146818" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="uMLzml7WBTI0OvoxbWRifh9loXwZ1ZCKQL3WppoXU2Lyefe7bagBz+orUOvgmfrKw8vHv4pV1JXuOVX5ZRt/BQ=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>1.4.2</title>
             <pubDate>Mon, 09 Nov 2026 23:31:05 -0600</pubDate>
             <sparkle:version>8</sparkle:version>
             <sparkle:shortVersionString>1.4.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.2/AutoHideAgent-macOS-v1.4.2.zip" length="1703591" type="application/octet-stream" sparkle:edSignature="ky0XJQwHHdycU3dS9dtQrDa/Atpg1R61vTDrPrvcZmBdc5PIr1X+H+SpnuOdtQPtuIdCTcpthv8ARFK+Kef6DA=="/>
-            <sparkle:deltas>
-                <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.2/AutoHideAgent8-7.delta" sparkle:deltaFrom="7" length="111842" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="976432" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="3WjY3GSFB91Xgg3wjF18y8YTmwV8l7HQYHla5b57fLUBrGjJTt2lBHpZSbtu0wAR3dUcvwSSYbbmwuvnqCfqAw=="/>
-                <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.2/AutoHideAgent8-6.delta" sparkle:deltaFrom="6" length="127282" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="976432" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="1FcugzIGC/faWhsr8lNhPmkbVa1DAZP4CGpMPvmRi+Ag/tSU8T9Juv4zxU5j0yRx4K6Am3lq3nJv4xgHHSpjAA=="/>
-                <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.2/AutoHideAgent8-5.delta" sparkle:deltaFrom="5" length="136042" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="+OXGS8m3PZwZo0P0rNVkt3EVFN2+s8V3Acl31dmE6I6b4x4YpukbAYsdryR0rTeMn6GL/KaYhj62IdqgLNTBAw=="/>
-            </sparkle:deltas>
+            <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.3/AutoHideAgent-macOS-v1.4.2.zip" length="1703591" type="application/octet-stream" sparkle:edSignature="ky0XJQwHHdycU3dS9dtQrDa/Atpg1R61vTDrPrvcZmBdc5PIr1X+H+SpnuOdtQPtuIdCTcpthv8ARFK+Kef6DA=="/>
         </item>
         <item>
             <title>1.4.1</title>
@@ -23,16 +33,7 @@
             <sparkle:shortVersionString>1.4.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.2/AutoHideAgent-macOS-v1.4.1.zip" length="1697159" type="application/octet-stream" sparkle:edSignature="dI1oHDSUVm6mZ3d69Ss7KjcWff6+HPYKPKuimp5bYtL4HiO56OGDb53DKQS2O+JhX6D9OnlPf5kwKwYfoWT+Cg=="/>
-        </item>
-        <item>
-            <title>1.4.0</title>
-            <pubDate>Mon, 09 Nov 2026 21:53:26 -0600</pubDate>
-            <sparkle:version>6</sparkle:version>
-            <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.2/AutoHideAgent-macOS-v1.4.0.zip" length="1690613" type="application/octet-stream" sparkle:edSignature="R0QjOPvGzorVm6NVyJvBiZuA3kNYEVOuAp/PSdLTjjZlDk6PHVQuj2Kq78EsQrEzajsh81EXWJF3nWZ9909LAw=="/>
+            <enclosure url="https://github.com/msynthnova/AutoHideAgent/releases/download/v1.4.3/AutoHideAgent-macOS-v1.4.1.zip" length="1697159" type="application/octet-stream" sparkle:edSignature="dI1oHDSUVm6mZ3d69Ss7KjcWff6+HPYKPKuimp5bYtL4HiO56OGDb53DKQS2O+JhX6D9OnlPf5kwKwYfoWT+Cg=="/>
         </item>
     </channel>
 </rss>

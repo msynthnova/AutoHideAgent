@@ -16,6 +16,7 @@ public struct MainDashboardView: View {
     @State private var selectedSection: NavigationSection = .overview
     @State private var appSearchText: String = ""
     @State private var logSearchText: String = ""
+    @State private var isMaximized: Bool = false
 
     public enum NavigationSection: String, CaseIterable, Identifiable {
         case overview = "General"
@@ -242,6 +243,14 @@ public struct MainDashboardView: View {
             manager.refreshRunningApps()
             manager.refreshLaunchAtLoginStatus()
             manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+            if let window = NSApplication.shared.windows.first(where: { $0.title == "AutoHideAgent" }) {
+                isMaximized = window.isZoomed
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResizeNotification)) { _ in
+            if let window = NSApplication.shared.windows.first(where: { $0.title == "AutoHideAgent" }) {
+                isMaximized = window.isZoomed
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             if !manager.isAccessibilityTrusted {
@@ -293,6 +302,13 @@ public struct MainDashboardView: View {
         }
     }
 
+    private func toggleMaximize() {
+        if let window = NSApplication.shared.keyWindow ?? NSApplication.shared.windows.first(where: { $0.title == "AutoHideAgent" }) {
+            window.performZoom(nil)
+            isMaximized = window.isZoomed
+        }
+    }
+
     // MARK: - 1. Liquid Glass Sidebar
 
     private var sidebarView: some View {
@@ -314,6 +330,7 @@ public struct MainDashboardView: View {
                 .padding(.vertical, 2)
                 .badge(badgeCount(for: section))
                 .tag(section)
+                .pointingHandCursor()
             }
         }
         .listStyle(.sidebar)
@@ -486,6 +503,7 @@ public struct MainDashboardView: View {
                             }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.regular)
+                            .pointingHandCursor()
                             .disabled(!manager.isEnabled || manager.eligibleToHideCount == 0)
                         }
                         .fixedSize(horizontal: true, vertical: false)
@@ -526,6 +544,7 @@ public struct MainDashboardView: View {
                             }
                             .labelsHidden()
                             .frame(width: 120)
+                            .pointingHandCursor()
                             .disabled(!manager.isEnabled || !manager.isAutoHideEnabled)
 
                             Toggle("", isOn: $manager.isAutoHideEnabled)
@@ -558,6 +577,7 @@ public struct MainDashboardView: View {
                             }
                             .labelsHidden()
                             .frame(width: 120)
+                            .pointingHandCursor()
                             .disabled(!manager.isEnabled || !manager.isAutoQuitEnabled)
 
                             Toggle("", isOn: $manager.isAutoQuitEnabled)
@@ -770,7 +790,7 @@ public struct MainDashboardView: View {
     }
 
     private var currentAppVersionDisplay: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.4.2"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.4.3"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "8"
         return "v\(version) (Build \(build))"
     }
@@ -861,6 +881,7 @@ public struct MainDashboardView: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .buttonStyle(.bordered)
+                .pointingHandCursor()
                 .help("Refresh the list now (also refreshes automatically every 10 seconds)")
 
                 Button {
@@ -874,6 +895,7 @@ public struct MainDashboardView: View {
                     )
                 }
                 .buttonStyle(.borderedProminent)
+                .pointingHandCursor()
                 .disabled(manager.eligibleToHideCount == 0)
                 .fixedSize()
             }
@@ -954,6 +976,7 @@ public struct MainDashboardView: View {
                     }
                 }
                 .buttonStyle(.bordered)
+                .pointingHandCursor()
                 .tint(isWhitelisted ? .indigo : .none)
                 .controlSize(.small)
 
@@ -962,6 +985,7 @@ public struct MainDashboardView: View {
                         manager.manuallyHideApp(app)
                     }
                     .buttonStyle(.bordered)
+                    .pointingHandCursor()
                     .controlSize(.small)
                 }
 
@@ -969,6 +993,7 @@ public struct MainDashboardView: View {
                     manager.manuallyQuitApp(app)
                 }
                 .buttonStyle(.bordered)
+                .pointingHandCursor()
                 .controlSize(.small)
             }
         }
@@ -1053,6 +1078,7 @@ public struct MainDashboardView: View {
                     addCustomExclusion()
                 }
                 .buttonStyle(.bordered)
+                .pointingHandCursor()
                 .disabled(customInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                 Button {
@@ -1061,6 +1087,7 @@ public struct MainDashboardView: View {
                     Label("Choose App…", systemImage: "plus.app")
                 }
                 .buttonStyle(.borderedProminent)
+                .pointingHandCursor()
                 .fixedSize()
             }
 
@@ -1102,6 +1129,7 @@ public struct MainDashboardView: View {
                                         manager.removeWhitelistEntry(item)
                                     }
                                     .buttonStyle(.bordered)
+                                    .pointingHandCursor()
                                     .controlSize(.small)
                                 } else {
                                     Text("System Default")
@@ -1372,5 +1400,15 @@ public struct LiquidGlassIcon: View {
         } else {
             tile.overlay(shape.strokeBorder(Color.white.opacity(0.25), lineWidth: 0.5))
         }
+    }
+}
+
+// MARK: - Pointing Hand Cursor Extension
+
+extension View {
+    /// Applies macOS pointing hand cursor on hover for clickable items.
+    @ViewBuilder
+    public func pointingHandCursor() -> some View {
+        self.pointerStyle(.link)
     }
 }
