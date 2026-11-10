@@ -1416,9 +1416,17 @@ public final class AutoHideManager {
                 elapsed = max(0, min(wallElapsed, upElapsed))
             }
             var icon = iconCache[bundleID]
-            if icon == nil, let appIcon = app.icon {
-                iconCache[bundleID] = appIcon
-                icon = appIcon
+            if icon == nil {
+                if let bundleURL = app.bundleURL {
+                    let highResIcon = NSWorkspace.shared.icon(forFile: bundleURL.path)
+                    highResIcon.size = NSSize(width: 64, height: 64)
+                    iconCache[bundleID] = highResIcon
+                    icon = highResIcon
+                } else if let appIcon = app.icon {
+                    appIcon.size = NSSize(width: 64, height: 64)
+                    iconCache[bundleID] = appIcon
+                    icon = appIcon
+                }
             }
 
             return RunningAppInfo(

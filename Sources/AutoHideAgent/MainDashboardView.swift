@@ -26,10 +26,19 @@ public struct MainDashboardView: View {
 
         public var icon: String {
             switch self {
-            case .overview: return "gearshape"
+            case .overview: return "gearshape.fill"
             case .runningApps: return "macwindow.on.rectangle"
-            case .exclusions: return "shield.lefthalf.filled"
+            case .exclusions: return "shield.checkered"
             case .activityLog: return "clock.arrow.circlepath"
+            }
+        }
+
+        public var badgeGradient: AnyShapeStyle {
+            switch self {
+            case .overview: return AnyShapeStyle(Color.gray.gradient)
+            case .runningApps: return AnyShapeStyle(Color.blue.gradient)
+            case .exclusions: return AnyShapeStyle(Color.purple.gradient)
+            case .activityLog: return AnyShapeStyle(Color.teal.gradient)
             }
         }
     }
@@ -285,19 +294,15 @@ public struct MainDashboardView: View {
     private var sidebarView: some View {
         List(selection: $selectedSection) {
             ForEach(NavigationSection.allCases) { section in
-                HStack(spacing: 9) {
-                    Image(systemName: section.icon)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(selectedSection == section ? Color.primary : Color.accentColor)
-                        .frame(width: 20, alignment: .center)
+                HStack(spacing: 10) {
+                    sidebarIcon(for: section)
 
                     Text(section.rawValue)
                         .font(.system(size: 13, weight: selectedSection == section ? .medium : .regular))
 
                     Spacer()
                 }
-                .padding(.leading, 4)
-                .listRowInsets(EdgeInsets(top: 4, leading: 14, bottom: 4, trailing: 12))
+                .padding(.vertical, 2)
                 .badge(badgeCount(for: section))
                 .tag(section)
                 .pointerStyle(.link)
@@ -306,6 +311,19 @@ public struct MainDashboardView: View {
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) {
             sidebarStatusFooter
+        }
+    }
+
+    private func sidebarIcon(for section: NavigationSection) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(section.badgeGradient)
+                .frame(width: 24, height: 24)
+                .shadow(color: .black.opacity(0.12), radius: 1, x: 0, y: 0.5)
+
+            Image(systemName: section.icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
         }
     }
 
@@ -357,7 +375,7 @@ public struct MainDashboardView: View {
         return "Active • \(manager.visibleBackgroundAppsCount) visible"
     }
 
-    // MARK: - 2. Centered System Settings Detail Canvas (maxWidth: 650)
+    // MARK: - 2. Native macOS Detail Canvas (Adaptive Width)
 
     private var detailCanvas: some View {
         ScrollView {
@@ -379,12 +397,11 @@ public struct MainDashboardView: View {
                     activityLogSection
                 }
             }
-            .frame(maxWidth: 650, alignment: .leading)
-            .padding(.horizontal, 28)
-            .padding(.vertical, 24)
-            .frame(maxWidth: .infinity, alignment: .center)
+            .frame(maxWidth: selectedSection == .overview ? 680 : .infinity, alignment: .leading)
+            .padding(.horizontal, selectedSection == .overview ? 28 : 22)
+            .padding(.vertical, 22)
+            .frame(maxWidth: .infinity, alignment: selectedSection == .overview ? .center : .leading)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     // MARK: - Tab 1: General Settings (System Settings Style)
@@ -399,7 +416,9 @@ public struct MainDashboardView: View {
                             Image(nsImage: appIcon)
                                 .resizable()
                                 .interpolation(.high)
-                                .frame(width: 40, height: 40)
+                                .frame(width: 44, height: 44)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
                         }
 
                         VStack(alignment: .leading, spacing: 2) {
@@ -752,8 +771,8 @@ public struct MainDashboardView: View {
     }
 
     private var currentAppVersionDisplay: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.4.0"
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "6"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.4.1"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "7"
         return "v\(version) (Build \(build))"
     }
 
@@ -821,30 +840,32 @@ public struct MainDashboardView: View {
 
     private var runningAppsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
+            HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Background Applications (\(manager.runningRegularApps.count))")
-                        .font(.system(size: 15, weight: .semibold))
+                    Text("Background Apps")
+                        .font(.system(size: 16, weight: .semibold))
                     Text("\(manager.visibleBackgroundAppsCount) visible • \(manager.hiddenBackgroundAppsCount) hidden")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
+                .fixedSize(horizontal: true, vertical: false)
 
-                Spacer()
+                Spacer(minLength: 16)
 
                 TextField("Filter apps…", text: $appSearchText)
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 180)
+                    .frame(width: 130)
 
                 Button {
                     manager.hideAllBackgroundAppsNow()
                 } label: {
-                    Label("Hide All Visible Now", systemImage: "eye.slash.fill")
+                    Label("Hide All Visible", systemImage: "eye.slash.fill")
                         .font(.system(size: 12, weight: .medium))
                 }
                 .buttonStyle(.borderedProminent)
                 .pointerStyle(.link)
                 .controlSize(.regular)
+                .fixedSize()
             }
 
             settingsGroupBox {
@@ -884,66 +905,104 @@ public struct MainDashboardView: View {
             if let icon = app.icon {
                 Image(nsImage: icon)
                     .resizable()
-                    .frame(width: 26, height: 26)
-                    .opacity(app.isHidden ? 0.55 : 1.0)
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .frame(width: 32, height: 32)
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    .shadow(color: .black.opacity(0.14), radius: 1.5, x: 0, y: 1)
+                    .opacity(app.isHidden ? 0.6 : 1.0)
             } else {
-                Image(systemName: "app.fill")
-                    .font(.system(size: 20))
-                    .frame(width: 26, height: 26)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.secondary.opacity(0.15))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: "app.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.secondary)
+                }
             }
 
-            VStack(alignment: .leading, spacing: 1.5) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 2.5) {
+                HStack(spacing: 7) {
                     Text(app.localizedName)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 13.5, weight: .medium))
                         .foregroundStyle(app.isHidden ? .secondary : .primary)
 
-                    if app.isHidden {
-                        Text("Hidden")
-                            .font(.system(size: 10.5, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .background(Capsule().fill(Color.primary.opacity(0.07)))
-                    }
+                    appStatusBadge(for: app, isWhitelisted: isWhitelisted)
                 }
 
                 Text(appStatusDescription(for: app, isWhitelisted: isWhitelisted))
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            Button(isWhitelisted ? "Excluded" : "Exclude") {
-                if isWhitelisted {
-                    manager.removeWhitelistEntry(app.bundleIdentifier)
-                } else {
-                    manager.addWhitelistEntry(app.bundleIdentifier)
+            HStack(spacing: 6) {
+                Button(isWhitelisted ? "Excluded" : "Exclude") {
+                    if isWhitelisted {
+                        manager.removeWhitelistEntry(app.bundleIdentifier)
+                    } else {
+                        manager.addWhitelistEntry(app.bundleIdentifier)
+                    }
                 }
-            }
-            .buttonStyle(.bordered)
-            .pointerStyle(.link)
-            .controlSize(.small)
+                .buttonStyle(.bordered)
+                .tint(isWhitelisted ? .purple : .none)
+                .pointerStyle(.link)
+                .controlSize(.small)
 
-            if !app.isHidden {
-                Button("Hide") {
-                    manager.manuallyHideApp(app)
+                if !app.isHidden {
+                    Button("Hide") {
+                        manager.manuallyHideApp(app)
+                    }
+                    .buttonStyle(.bordered)
+                    .pointerStyle(.link)
+                    .controlSize(.small)
+                }
+
+                Button("Quit") {
+                    manager.manuallyQuitApp(app)
                 }
                 .buttonStyle(.bordered)
                 .pointerStyle(.link)
                 .controlSize(.small)
             }
-
-            Button("Quit") {
-                manager.manuallyQuitApp(app)
-            }
-            .buttonStyle(.bordered)
-            .pointerStyle(.link)
-            .controlSize(.small)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 9)
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private func appStatusBadge(for app: RunningAppInfo, isWhitelisted: Bool) -> some View {
+        if isWhitelisted {
+            Text("Excluded")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.purple)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1.5)
+                .background(Capsule().fill(Color.purple.opacity(0.12)))
+        } else if app.hasActivePowerAssertion {
+            Text("Audio / Call")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1.5)
+                .background(Capsule().fill(Color.orange.opacity(0.12)))
+        } else if app.isProtectedMostRecent {
+            Text("Recent Background")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.blue)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1.5)
+                .background(Capsule().fill(Color.blue.opacity(0.12)))
+        } else if app.isHidden {
+            Text("Hidden")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1.5)
+                .background(Capsule().fill(Color.primary.opacity(0.07)))
+        }
     }
 
     private func appStatusDescription(for app: RunningAppInfo, isWhitelisted: Bool) -> String {
@@ -1150,11 +1209,12 @@ public struct MainDashboardView: View {
         content()
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.6))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
             )
     }
 

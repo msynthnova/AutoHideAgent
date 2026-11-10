@@ -69,20 +69,20 @@ if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
     SIGN_IDENTITY="$CODESIGN_IDENTITY"
     echo "==> Signing $APP_BUNDLE with specified identity '$SIGN_IDENTITY'..."
 elif [[ "$MODE" == "release" ]]; then
-    SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' | head -n 1)
+    SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Developer ID Application" | awk '{print $2}' | head -n 1)
     if [[ -z "$SIGN_IDENTITY" ]]; then
         SIGN_IDENTITY="-"
         echo "==> WARNING: Developer ID Application certificate not found. Signing with ad-hoc signature..."
     else
-        echo "==> Signing Release $APP_BUNDLE with Developer ID: '$SIGN_IDENTITY'..."
+        echo "==> Signing Release $APP_BUNDLE with Developer ID SHA1: '$SIGN_IDENTITY'..."
     fi
 else
-    SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Apple Development:[^"]*\)".*/\1/p' | head -n 1)
+    SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Development" | awk '{print $2}' | head -n 1)
     if [[ -z "$SIGN_IDENTITY" ]]; then
         SIGN_IDENTITY="-"
         echo "==> Signing Debug $APP_BUNDLE with ad-hoc signature..."
     else
-        echo "==> Signing Debug $APP_BUNDLE with '$SIGN_IDENTITY'..."
+        echo "==> Signing Debug $APP_BUNDLE with Apple Development SHA1: '$SIGN_IDENTITY'..."
     fi
 fi
 
@@ -120,7 +120,7 @@ if [[ "$MODE" == "release" ]]; then
     mkdir -p "$DIST_DIR"
 
     # Apple Notarization
-    if [[ "$SIGN_IDENTITY" == Developer\ ID\ Application:* ]]; then
+    if security find-identity -v -p codesigning 2>/dev/null | grep "$SIGN_IDENTITY" | grep -q "Developer ID Application"; then
         echo "==> Checking Apple Notary Service credentials for profile '$NOTARY_PROFILE'..."
         if xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
             TEMP_NOTARY_ZIP="$DIST_DIR/AutoHideAgent-notarize.zip"

@@ -109,7 +109,7 @@ SHA256_VAL=$(awk '{print $1}' "$SHA256_FILE")
 # 5. Git Commit and Tag in AutoHideAgent
 echo "==> Step 4/6: Committing and tagging release in git..."
 cd "$PROJECT_DIR"
-git add Casks/autohideagent.rb Info.plist README.md Sources/AutoHideAgent/MainDashboardView.swift appcast.xml bundle.sh publish.sh dist/AutoHideAgent-macOS-v${NEW_VERSION}.zip dist/AutoHideAgent-macOS-v${NEW_VERSION}.zip.sha256
+git add Casks/ Info.plist README.md Sources/ appcast.xml bundle.sh publish.sh DEVELOPMENT.md .agentrules dist/AutoHideAgent-macOS-v${NEW_VERSION}.zip dist/AutoHideAgent-macOS-v${NEW_VERSION}.zip.sha256
 git commit -m "Release v${NEW_VERSION}: ${RELEASE_DESC}"
 git push origin main
 

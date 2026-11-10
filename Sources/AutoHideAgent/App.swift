@@ -192,14 +192,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     private func setupAndShowMainWindow() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 840, height: 580),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            contentRect: NSRect(x: 0, y: 0, width: 960, height: 620),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = "AutoHideAgent"
-        window.isOpaque = true
-        window.backgroundColor = .windowBackgroundColor
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.toolbarStyle = .unified
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.center()
