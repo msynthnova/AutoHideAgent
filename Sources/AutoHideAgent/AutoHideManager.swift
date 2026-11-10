@@ -770,6 +770,20 @@ public final class AutoHideManager {
     private func setupWorkspaceNotifications() {
         let nc = NSWorkspace.shared.notificationCenter
 
+        // 0. AutoHideAgent became active (user switched back from System Settings or another app)
+        let appActiveObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if !self.isAccessibilityTrusted {
+                    self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+                }
+            }
+        }
+
         // 1. Application became active (frontmost)
         let activateObserver = nc.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
@@ -955,6 +969,7 @@ public final class AutoHideManager {
         }
 
         workspaceObservers = [
+            appActiveObserver,
             activateObserver,
             deactivateObserver,
             terminateObserver,

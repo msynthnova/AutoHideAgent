@@ -7,13 +7,16 @@ set -euo pipefail
 
 MODE="${1:-debug}"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [[ -z "${SDKROOT:-}" || ! -d "${SDKROOT:-}" ]]; then
+    export SDKROOT="$(xcrun -sdk macosx --show-sdk-path 2>/dev/null || true)"
+fi
 APP_BUNDLE="$PROJECT_DIR/build/AutoHideAgent.app"
 CONTENTS_DIR="$APP_BUNDLE/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 FRAMEWORKS_DIR="$CONTENTS_DIR/Frameworks"
 DIST_DIR="$PROJECT_DIR/dist"
-APP_VERSION="${2:-$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PROJECT_DIR/Info.plist" 2>/dev/null || echo "1.2.0")}"
+APP_VERSION="${2:-$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PROJECT_DIR/Info.plist" 2>/dev/null || echo "1.3.0")}"
 
 echo "==> Building AutoHideAgent (Swift 6, configuration: $MODE)..."
 swift build --package-path "$PROJECT_DIR" -c "$MODE"

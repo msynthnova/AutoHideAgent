@@ -36,88 +36,188 @@ public struct MainDashboardView: View {
 
     private let uiRefreshTimer = Timer.publish(every: 10.0, tolerance: 2.0, on: .main, in: .common).autoconnect()
 
+    @State private var isPrivacyInfoExpanded: Bool = false
+    @State private var showPermissionGrantedBadge: Bool = false
+
     public init(manager: AutoHideManager) {
         self.manager = manager
     }
 
     public var body: some View {
-        Group {
-            if manager.isAccessibilityTrusted {
-                mainContent
-            } else {
-                accessibilitySetupGate
-            }
-        }
-        .animation(.easeInOut(duration: 0.2), value: manager.isAccessibilityTrusted)
-        .onAppear { manager.refreshAccessibilityTrustStatus(promptIfNeeded: false) }
+        mainContent
+            .animation(.easeInOut(duration: 0.25), value: manager.isAccessibilityTrusted)
+            .onAppear { manager.refreshAccessibilityTrustStatus(promptIfNeeded: false) }
     }
 
-    // MARK: - First-Run Accessibility Gate (must grant before using the app)
+    // MARK: - Modern Non-Blocking Accessibility Alert & Privacy Guarantee
 
-    private var accessibilitySetupGate: some View {
-        VStack(spacing: 18) {
-            Spacer(minLength: 0)
-            if let appIcon = NSApplication.shared.applicationIconImage {
-                Image(nsImage: appIcon).resizable().frame(width: 84, height: 84)
-            }
-            Text("Welcome to AutoHideAgent")
-                .font(.system(size: 24, weight: .bold))
-            Text("AutoHideAgent needs Accessibility access so macOS lets it hide and manage other apps' windows. It never reads your screen or keystrokes.")
-                .font(.system(size: 13.5))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 440)
+    private var accessibilityAlertBanner: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: "exclamationmark.shield.fill")
+                    .font(.system(size: 26))
+                    .foregroundStyle(.orange)
 
-            VStack(alignment: .leading, spacing: 10) {
-                setupStep(1, "Click \"Grant Access…\" below to open System Settings.")
-                setupStep(2, "Go to Privacy & Security → Accessibility.")
-                setupStep(3, "Turn the switch next to AutoHideAgent ON.")
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack {
+                        Text("Accessibility Permission Required")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.primary)
+
+                        Spacer()
+
+                        Text("Paused")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(Color.orange.opacity(0.15))
+                            )
+                    }
+
+                    Text("AutoHideAgent is paused. macOS requires Accessibility access so background windows can be hidden and managed.")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .padding(14)
-            .frame(maxWidth: 440, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
 
             HStack(spacing: 10) {
-                Button("Grant Access…") {
-                    manager.refreshAccessibilityTrustStatus(promptIfNeeded: true)
+                Button {
+                    manager.openSystemAccessibilityPrivacyPane()
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "gearshape.fill")
+                        Text("Open System Settings…")
+                    }
                 }
                 .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .tint(.orange)
+                .controlSize(.regular)
                 .pointerStyle(.link)
 
                 Button("Reset & Retry") {
                     manager.resetAndPromptAccessibilityPermission()
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.large)
+                .controlSize(.regular)
                 .pointerStyle(.link)
-                .help("Use this if AutoHideAgent is already switched on in System Settings but still isn't detected")
+                .help("Clears stale macOS permission registrations from older builds and triggers a fresh prompt")
+
+                Spacer()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isPrivacyInfoExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: isPrivacyInfoExpanded ? "chevron.up" : "info.circle")
+                        Text(isPrivacyInfoExpanded ? "Hide Details" : "Why is this needed?")
+                    }
+                    .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+                .pointerStyle(.link)
+            }
+
+            if isPrivacyInfoExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    Divider()
+                    Text("Privacy & Security Guarantee:")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(.primary)
+
+                    privacyBullet(
+                        icon: "macwindow.badge.plus",
+                        title: "Window Hiding Only",
+                        desc: "Uses Apple's AXUIElement API strictly to minimize or hide background application windows."
+                    )
+                    privacyBullet(
+                        icon: "eye.slash.fill",
+                        title: "Zero Screen Recording & Keystroke Access",
+                        desc: "Never captures screenshots, video feeds, or keyboard inputs. Fully sandboxed from your private documents."
+                    )
+                    privacyBullet(
+                        icon: "network.slash",
+                        title: "100% Offline & Local",
+                        desc: "Runs entirely on your Mac. Never connects to external servers and collects zero telemetry."
+                    )
+                }
+                .padding(.top, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             HStack(spacing: 6) {
-                ProgressView().controlSize(.small)
-                Text("Waiting for permission — this screen closes automatically once it's granted.")
+                Image(systemName: "lightbulb.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Text("Already switched ON in System Settings? Simply flip it OFF and back ON once to refresh.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top, 2)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.orange.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.orange.opacity(0.3), lineWidth: 1)
+        )
+    }
+
+    private func privacyBullet(icon: String, title: String, desc: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 16, alignment: .center)
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text(desc)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var permissionGrantedSuccessBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(.green)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Accessibility Permission Enabled")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text("AutoHideAgent is active and monitoring background windows.")
                     .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 0)
-        }
-        .padding(32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .frame(minWidth: 560, minHeight: 520)
-    }
 
-    private func setupStep(_ n: Int, _ text: String) -> some View {
-        HStack(spacing: 10) {
-            Text("\(n)")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 20, height: 20)
-                .background(Circle().fill(Color.accentColor))
-            Text(text).font(.system(size: 13))
+            Spacer()
         }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.green.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.green.opacity(0.3), lineWidth: 1)
+        )
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     private var mainContent: some View {
@@ -132,6 +232,23 @@ public struct MainDashboardView: View {
             manager.refreshRunningApps()
             manager.refreshLaunchAtLoginStatus()
             manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            if !manager.isAccessibilityTrusted {
+                manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+            }
+        }
+        .onChange(of: manager.isAccessibilityTrusted) { oldValue, newValue in
+            if !oldValue && newValue {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showPermissionGrantedBadge = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4.5) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showPermissionGrantedBadge = false
+                    }
+                }
+            }
         }
         .onReceive(uiRefreshTimer) { _ in
             guard let window = NSApplication.shared.windows.first(where: { $0.title == "AutoHideAgent" }),
@@ -226,11 +343,13 @@ public struct MainDashboardView: View {
     }
 
     private var statusDotColor: Color {
+        guard manager.isAccessibilityTrusted else { return .orange }
         guard manager.isEnabled else { return Color.secondary.opacity(0.45) }
         return manager.isTemporarilyPaused ? .orange : .green
     }
 
     private var statusSummaryText: String {
+        guard manager.isAccessibilityTrusted else { return "Needs Permission • Paused" }
         guard manager.isEnabled else { return "AutoHideAgent is Off" }
         if let until = manager.pausedUntilDate, Date.now < until {
             return "Paused (\(manager.formatFriendlyDuration(until.timeIntervalSinceNow)))"
@@ -243,6 +362,12 @@ public struct MainDashboardView: View {
     private var detailCanvas: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                if !manager.isAccessibilityTrusted {
+                    accessibilityAlertBanner
+                } else if showPermissionGrantedBadge {
+                    permissionGrantedSuccessBanner
+                }
+
                 switch selectedSection {
                 case .overview:
                     generalSettingsSection
@@ -627,8 +752,8 @@ public struct MainDashboardView: View {
     }
 
     private var currentAppVersionDisplay: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.2.0"
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "4"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.3.0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "5"
         return "v\(version) (Build \(build))"
     }
 

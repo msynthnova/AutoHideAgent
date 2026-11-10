@@ -75,29 +75,79 @@ public struct MenuPopoverView: View {
     }
 
     private var setupRequiredPanel: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "hand.raised.fill")
-                .font(.system(size: 26))
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.shield.fill")
+                .font(.system(size: 28))
                 .foregroundStyle(.orange)
-            Text("Setup Required")
-                .font(.system(size: 14, weight: .semibold))
-            Text("Grant Accessibility access to start using AutoHideAgent.")
+                .padding(.top, 4)
+
+            Text("Accessibility Required")
+                .font(.system(size: 14, weight: .bold))
+                .multilineTextAlignment(.center)
+
+            Text("AutoHideAgent is paused. macOS requires Accessibility access to automatically hide background windows.")
                 .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("Open AutoHideAgent to Set Up") {
-                onClosePanel?()
-                onOpenMainWindow?()
-            }
-            .buttonStyle(.borderedProminent)
-            .pointerStyle(.link)
-            Button("Quit AutoHideAgent") { NSApplication.shared.terminate(nil) }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 4)
+
+            VStack(spacing: 8) {
+                Button {
+                    manager.openSystemAccessibilityPrivacyPane()
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "gearshape.fill")
+                        Text("Open System Settings…")
+                    }
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+                .controlSize(.regular)
                 .pointerStyle(.link)
-                .font(.system(size: 11.5))
-                .foregroundStyle(.secondary)
+
+                Button {
+                    onClosePanel?()
+                    onOpenMainWindow?()
+                } label: {
+                    Text("Open Full Dashboard")
+                        .font(.system(size: 11.5))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .pointerStyle(.link)
+            }
+            .padding(.top, 2)
+
+            VStack(spacing: 4) {
+                Text("💡 If already ON, toggle OFF and ON once.")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+
+                Text("100% Offline • Zero Screen or Keystroke Access")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+            .multilineTextAlignment(.center)
+            .padding(.top, 2)
+
+            hairlineDivider
+                .padding(.vertical, 4)
+
+            Button("Quit AutoHideAgent") {
+                NSApplication.shared.terminate(nil)
+            }
+            .buttonStyle(.plain)
+            .pointerStyle(.link)
+            .font(.system(size: 11.5))
+            .foregroundStyle(.secondary)
         }
-        .padding(18)
+        .padding(16)
+        .onAppear {
+            manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
+        }
     }
 
     private var fullPanelContent: some View {
