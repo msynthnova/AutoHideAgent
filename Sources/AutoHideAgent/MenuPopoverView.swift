@@ -308,7 +308,9 @@ public struct MenuPopoverView: View {
                 manager.isAutoHideEnabled.toggle()
             },
             onRowTap: {
-                expandedSection = isExpanded ? nil : .autoHide
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                    expandedSection = isExpanded ? nil : .autoHide
+                }
             }
         )
     }
@@ -318,9 +320,9 @@ public struct MenuPopoverView: View {
             Text("Hide Inactive Apps After")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+                .padding(.bottom, 2)
 
             ForEach(TimeoutPreset.allCases) { preset in
                 let isSelected = manager.isAutoHideEnabled && (manager.timeoutSeconds == preset.rawValue)
@@ -342,11 +344,19 @@ public struct MenuPopoverView: View {
             ) {
                 manager.isAutoHideEnabled = false
             }
-            .padding(.bottom, 6)
         }
-        .background(Color.primary.opacity(0.06))
-        .overlay(alignment: .top) { hairlineDivider }
-        .overlay(alignment: .bottom) { hairlineDivider }
+        .padding(4)
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.75)
+        )
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     private var autoQuitControlCenterRow: some View {
@@ -370,7 +380,9 @@ public struct MenuPopoverView: View {
                 manager.isAutoQuitEnabled.toggle()
             },
             onRowTap: {
-                expandedSection = isExpanded ? nil : .autoQuit
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                    expandedSection = isExpanded ? nil : .autoQuit
+                }
             }
         )
     }
@@ -380,9 +392,9 @@ public struct MenuPopoverView: View {
             Text("Quit Hidden Apps After")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+                .padding(.bottom, 2)
 
             ForEach(QuitTimeoutPreset.allCases) { preset in
                 let isSelected = manager.isAutoQuitEnabled && (manager.quitTimeoutSeconds == preset.rawValue)
@@ -405,15 +417,24 @@ public struct MenuPopoverView: View {
                 manager.isAutoQuitEnabled = false
             }
 
-            hairlineDivider
-                .padding(.vertical, 4)
+            Divider()
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
 
             confirmationCheckboxRow
-                .padding(.bottom, 6)
         }
-        .background(Color.primary.opacity(0.06))
-        .overlay(alignment: .top) { hairlineDivider }
-        .overlay(alignment: .bottom) { hairlineDivider }
+        .padding(4)
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.75)
+        )
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     private var confirmationCheckboxRow: some View {
@@ -434,17 +455,15 @@ public struct MenuPopoverView: View {
 
                 Spacer()
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4.5)
             .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
+                    .fill(isHovered ? Color.primary.opacity(0.09) : Color.clear)
             )
-            .padding(.horizontal, 6)
         }
         .buttonStyle(.plain)
-        .pointerStyle(.link)
         .onHover { hovering in
             hoveredRowID = hovering ? "autoquit.confirm" : (hoveredRowID == "autoquit.confirm" ? nil : hoveredRowID)
         }
@@ -605,22 +624,20 @@ public struct MenuPopoverView: View {
                     .frame(width: 14, alignment: .center)
 
                 Text(title)
-                    .font(.system(size: 12.5, weight: isSelected ? .medium : .regular))
+                    .font(.system(size: 12, weight: isSelected ? .medium : .regular))
                     .foregroundStyle(.primary)
 
                 Spacer()
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4.5)
             .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
+                    .fill(isHovered ? Color.primary.opacity(0.09) : (isSelected ? Color.accentColor.opacity(0.12) : Color.clear))
             )
-            .padding(.horizontal, 6)
         }
         .buttonStyle(.plain)
-        .pointerStyle(.link)
         .onHover { hovering in
             hoveredRowID = hovering ? id : (hoveredRowID == id ? nil : hoveredRowID)
         }

@@ -85,10 +85,11 @@ public struct RunningAppInfo: Identifiable, Hashable, Sendable {
     public let isHidden: Bool
     public let isProtectedMostRecent: Bool
     public let hasActivePowerAssertion: Bool
+    public let isWhitelisted: Bool
     public let deactivatedSince: Date?
     public let elapsedInactiveSeconds: TimeInterval?
 
-    public var id: String { bundleIdentifier }
+    public var id: String { "\(bundleIdentifier)-\(pid)" }
 }
 
 /// Debug automation hooks (snapshots, tab switching) are only active when launched with AUTOHIDE_DEBUG=1.
@@ -428,19 +429,19 @@ public final class AutoHideManager {
 
     // MARK: - Instant "Hide Background Apps Now" Action
 
-    /// Number of currently visible (unhidden) background `.regular` applications that are eligible to be hidden.
+    /// Number of currently visible (unhidden) background `.regular` applications.
     public var visibleBackgroundAppsCount: Int {
-        runningRegularApps.filter { app in
-            !app.isHidden && !whitelistedBundleIDs.contains {
-                $0.caseInsensitiveCompare(app.bundleIdentifier) == .orderedSame ||
-                $0.caseInsensitiveCompare(app.localizedName) == .orderedSame
-            }
-        }.count
+        runningRegularApps.filter { !$0.isHidden }.count
     }
 
     /// Number of currently hidden background `.regular` applications.
     public var hiddenBackgroundAppsCount: Int {
         runningRegularApps.filter { $0.isHidden }.count
+    }
+
+    /// Number of visible background applications that are eligible to be hidden (not whitelisted).
+    public var eligibleToHideCount: Int {
+        runningRegularApps.filter { !$0.isHidden && !$0.isWhitelisted }.count
     }
 
     /// Immediately hides all currently visible, non-whitelisted background `.regular` applications.
@@ -1320,6 +1321,15 @@ public final class AutoHideManager {
         switch response {
         case .alertFirstButtonReturn:
             autoQuitAttemptedPIDs.insert(pid)
+            // Safety guard: Ensure the app did not become active or terminated while the modal dialog was open
+            guard !app.isTerminated, !app.isActive, app != NSWorkspace.shared.frontmostApplication else {
+                appendLog(
+                    .info,
+                    "Cancelled quitting \(appName) because it became active or terminated.",
+                    technical: "pid=\(pid), isTerminated=\(app.isTerminated), isActive=\(app.isActive)"
+                )
+                break
+            }
             performGracefulQuit(for: app, appName: appName, friendlyTime: friendlyTime, inactiveDuration: inactiveDuration)
 
         case .alertSecondButtonReturn:
@@ -1429,6 +1439,8 @@ public final class AutoHideManager {
                 }
             }
 
+            let whitelisted = isAppWhitelisted(app)
+
             return RunningAppInfo(
                 pid: pid,
                 bundleIdentifier: bundleID,
@@ -1437,11 +1449,29 @@ public final class AutoHideManager {
                 isHidden: app.isHidden,
                 isProtectedMostRecent: keepPreviousAppVisible && (pid == mostRecentBackgroundPID),
                 hasActivePowerAssertion: protectActiveMediaApps && assertionPIDs.contains(pid),
+                isWhitelisted: whitelisted,
                 deactivatedSince: deactivated,
                 elapsedInactiveSeconds: elapsed
             )
         }
-        .sorted { $0.localizedName.localizedCaseInsensitiveCompare($1.localizedName) == .orderedAscending }
+        .sorted { (a, b) -> Bool in
+            // 1. Visible (open) applications appear before hidden applications
+            if a.isHidden != b.isHidden {
+                return !a.isHidden && b.isHidden
+            }
+            // 2. Protected most-recent background app comes first among visible apps
+            if a.isProtectedMostRecent != b.isProtectedMostRecent {
+                return a.isProtectedMostRecent && !b.isProtectedMostRecent
+            }
+            // 3. For apps with known inactivity, most recently active comes first
+            let aElapsed = a.elapsedInactiveSeconds ?? 0
+            let bElapsed = b.elapsedInactiveSeconds ?? 0
+            if abs(aElapsed - bElapsed) > 1.0 {
+                return aElapsed < bElapsed
+            }
+            // 4. Alphabetical tie-breaker
+            return a.localizedName.localizedCaseInsensitiveCompare(b.localizedName) == .orderedAscending
+        }
 
         self.runningRegularApps = apps
     }

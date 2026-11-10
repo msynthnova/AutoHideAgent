@@ -335,7 +335,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
                 let roundedHeight = ceil(measuredHeight)
                 if abs(roundedHeight - self.currentMeasuredPanelHeight) > 0.5 {
                     self.currentMeasuredPanelHeight = roundedHeight
-                    self.repositionAndResizeMenuPanel(animated: false)
+                    self.repositionAndResizeMenuPanel(animated: self.menuPanel?.isVisible == true)
                 }
             }
         )
