@@ -1,0 +1,21 @@
+# AutoHideAgent AI Assistant Rules
+
+1. ALWAYS ASK BEFORE RELEASING:
+   When completing a task, feature, or fix, ALWAYS ask the user:
+   "Should this change be a Commit only (save progress to git), or are we publishing a New Version Release?"
+
+2. MODE 1 - COMMIT ONLY:
+   - Run tests (`swift test`).
+   - Stage and commit with a clean git commit message.
+   - Push to `main`.
+   - Never bump versions, never notarize, never push tags, never release on GitHub.
+
+3. MODE 2 - NEW VERSION RELEASE:
+   - Run `./publish.sh patch "<description>"` (or `minor`).
+   - Never run manual ad-hoc release steps when `./publish.sh` exists.
+   - NEVER install or upgrade `/Applications/AutoHideAgent.app` automatically.
+   - The user installs updates themselves using `brew upgrade --cask --greedy autohideagent`.
+
+4. LOCAL TESTING ISOLATION:
+   - Local test builds stay inside `./build/AutoHideAgent.app`.
+   - Never overwrite `/Applications/AutoHideAgent.app`.
