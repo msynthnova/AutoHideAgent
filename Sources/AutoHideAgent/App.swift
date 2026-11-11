@@ -31,6 +31,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private var menuHostingView: FirstMouseHostingView<MenuPopoverView>?
     private var currentMeasuredPanelHeight: CGFloat = 356
     private var lastPanelCloseUptime: TimeInterval = 0
+    private var isPanelClosing: Bool = false
     private var globalClickMonitor: Any?
     private var localClickMonitor: Any?
     private var localMouseUpMonitor: Any?
@@ -108,8 +109,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         ) { [weak self] notification in
             let snapshotPath = notification.object as? String
             MainActor.assumeIsolated {
-                guard let self, let snapshotPath, let contentView = self.mainWindow?.contentView else { return }
+                guard let self, let snapshotPath else { return }
                 self.showMainWindow()
+                guard let contentView = self.mainWindow?.contentView else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     contentView.layoutSubtreeIfNeeded()
                     let bounds = contentView.bounds
@@ -245,6 +247,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             return
         }
         NSApplication.shared.activate(ignoringOtherApps: true)
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
         window.makeKeyAndOrderFront(nil)
     }
 
@@ -427,7 +432,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             return
         }
 
-        if menuPanel?.isVisible == true {
+        if menuPanel?.isVisible == true && !isPanelClosing {
             closeMenuPanel()
             return
         }
@@ -446,6 +451,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         }
         guard let panel = menuPanel, let hostingView = panel.contentView else { return }
 
+        isPanelClosing = false
+        hostingView.layer?.removeAllAnimations()
+
         hostingView.layoutSubtreeIfNeeded()
         let fittingHeight = ceil(hostingView.fittingSize.height)
         if fittingHeight > 100 {
@@ -453,8 +461,23 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         }
 
         repositionAndResizeMenuPanel(animated: false)
-        panel.alphaValue = 1.0
+        let finalFrame = panel.frame
+        let startFrame = NSRect(
+            x: finalFrame.origin.x,
+            y: finalFrame.origin.y + 6,
+            width: finalFrame.width,
+            height: finalFrame.height
+        )
+        panel.setFrame(startFrame, display: false)
+        panel.alphaValue = 0.0
         panel.makeKeyAndOrderFront(nil)
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.16
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().setFrame(finalFrame, display: true)
+            panel.animator().alphaValue = 1.0
+        }
 
         // Keep the menu bar icon background pill highlighted while the panel is open
         setStatusButtonHighlighted(true)
@@ -537,7 +560,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
         if animated && panel.isVisible {
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.14
+                context.duration = 0.24
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 panel.animator().setFrame(targetFrame, display: true)
             }
@@ -548,9 +571,21 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     private func closeMenuPanel() {
         setStatusButtonHighlighted(false)
-        if let panel = menuPanel, panel.isVisible {
+        if let panel = menuPanel, panel.isVisible, !isPanelClosing {
+            isPanelClosing = true
             lastPanelCloseUptime = ProcessInfo.processInfo.systemUptime
-            panel.orderOut(nil)
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.12
+                context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+                panel.animator().alphaValue = 0.0
+            } completionHandler: { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.isPanelClosing = false
+                    panel.orderOut(nil)
+                    panel.alphaValue = 1.0
+                }
+            }
         }
         if let monitor = globalClickMonitor {
             NSEvent.removeMonitor(monitor)

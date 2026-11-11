@@ -463,8 +463,9 @@ public struct MenuPopoverView: View {
                     .fill(isHovered ? Color.primary.opacity(0.09) : Color.clear)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TactileButtonStyle(pressedScale: 0.985, pressedOpacity: 0.78))
         .pointerStyle(.link)
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
         .onHover { hovering in
             hoveredRowID = hovering ? "autoquit.confirm" : (hoveredRowID == "autoquit.confirm" ? nil : hoveredRowID)
         }
@@ -557,13 +558,14 @@ public struct MenuPopoverView: View {
                     Circle()
                         .fill(isActive ? activeTint : Color.primary.opacity(0.11))
                         .frame(width: 28, height: 28)
+                        .animation(.easeInOut(duration: 0.2), value: isActive)
 
                     Image(systemName: icon)
                         .font(.system(size: 12.5, weight: .semibold))
                         .foregroundStyle(isActive ? Color.white : Color.primary.opacity(0.85))
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TactileButtonStyle(pressedScale: 0.92, pressedOpacity: 0.8))
             .pointerStyle(.link)
 
             // Main Row Area (toggles action or expands submenu)
@@ -588,11 +590,12 @@ public struct MenuPopoverView: View {
                             .font(.system(size: 10.5, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                            .animation(.spring(response: 0.28, dampingFraction: 0.82), value: isExpanded)
                     }
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TactileButtonStyle(pressedScale: 0.985, pressedOpacity: 0.78))
             .pointerStyle(.link)
         }
         .padding(.horizontal, 8)
@@ -602,6 +605,7 @@ public struct MenuPopoverView: View {
                 .fill(isHovered ? Color.primary.opacity(0.085) : Color.clear)
         )
         .padding(.horizontal, 6)
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
         .onHover { hovering in
             hoveredRowID = hovering ? id : (hoveredRowID == id ? nil : hoveredRowID)
         }
@@ -623,6 +627,7 @@ public struct MenuPopoverView: View {
                     .foregroundStyle(Color.accentColor)
                     .opacity(isSelected ? 1.0 : 0.0)
                     .frame(width: 14, alignment: .center)
+                    .animation(.easeInOut(duration: 0.15), value: isSelected)
 
                 Text(title)
                     .font(.system(size: 12, weight: isSelected ? .medium : .regular))
@@ -638,8 +643,9 @@ public struct MenuPopoverView: View {
                     .fill(isHovered ? Color.primary.opacity(0.09) : (isSelected ? Color.accentColor.opacity(0.12) : Color.clear))
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TactileButtonStyle(pressedScale: 0.985, pressedOpacity: 0.78))
         .pointerStyle(.link)
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
         .onHover { hovering in
             hoveredRowID = hovering ? id : (hoveredRowID == id ? nil : hoveredRowID)
         }
@@ -676,8 +682,9 @@ public struct MenuPopoverView: View {
                     .fill(isHovered ? Color.primary.opacity(0.09) : Color.clear)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TactileButtonStyle(pressedScale: 0.985, pressedOpacity: 0.78))
         .pointerStyle(.link)
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
         .onHover { hovering in
             hoveredRowID = hovering ? id : (hoveredRowID == id ? nil : hoveredRowID)
         }
@@ -709,3 +716,24 @@ extension QuitTimeoutPreset {
         }
     }
 }
+
+// MARK: - Native Tactile Button Style
+
+/// Interactive tactile feedback button style that gently scales and fades on mouse down.
+public struct TactileButtonStyle: ButtonStyle {
+    public var pressedScale: CGFloat = 0.985
+    public var pressedOpacity: Double = 0.78
+
+    public init(pressedScale: CGFloat = 0.985, pressedOpacity: Double = 0.78) {
+        self.pressedScale = pressedScale
+        self.pressedOpacity = pressedOpacity
+    }
+
+    public func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? pressedOpacity : 1.0)
+            .scaleEffect(configuration.isPressed ? pressedScale : 1.0)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+

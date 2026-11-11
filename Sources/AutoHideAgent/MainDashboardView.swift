@@ -17,6 +17,11 @@ public struct MainDashboardView: View {
     @State private var appSearchText: String = ""
     @State private var logSearchText: String = ""
     @State private var isMaximized: Bool = false
+    @State private var hoveredAppID: String? = nil
+    @State private var hoveredExclusionItem: String? = nil
+    @State private var hoveredLogID: UUID? = nil
+    @State private var copiedHomebrewCommand: Bool = false
+    @State private var isRefreshingApps: Bool = false
 
     public enum NavigationSection: String, CaseIterable, Identifiable {
         case overview = "General"
@@ -130,9 +135,9 @@ public struct MainDashboardView: View {
                     }
                     .font(.system(size: 12))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(TactileButtonStyle(pressedScale: 0.98, pressedOpacity: 0.78))
                 .foregroundStyle(Color.accentColor)
-                .pointerStyle(.link)
+                .pointingHandCursor()
             }
 
             if isPrivacyInfoExpanded {
@@ -763,9 +768,21 @@ public struct MainDashboardView: View {
                                 let pb = NSPasteboard.general
                                 pb.clearContents()
                                 pb.setString("brew install --cask msynthnova/tap/autohideagent", forType: .string)
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    copiedHomebrewCommand = true
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        copiedHomebrewCommand = false
+                                    }
+                                }
                             } label: {
-                                Label("Copy Command", systemImage: "doc.on.doc")
-                                    .font(.system(size: 12, weight: .medium))
+                                Label(
+                                    copiedHomebrewCommand ? "Copied to Clipboard" : "Copy Command",
+                                    systemImage: copiedHomebrewCommand ? "checkmark" : "doc.on.doc"
+                                )
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(copiedHomebrewCommand ? Color.green : Color.primary)
                             }
                             .buttonStyle(.bordered)
                             .pointerStyle(.link)
@@ -791,8 +808,8 @@ public struct MainDashboardView: View {
     }
 
     private var currentAppVersionDisplay: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.4.3"
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "8"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.4.4"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "11"
         return "v\(version) (Build \(build))"
     }
 
@@ -877,9 +894,17 @@ public struct MainDashboardView: View {
                     .frame(width: 170)
 
                 Button {
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        isRefreshingApps = true
+                    }
                     manager.refreshRunningApps()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        isRefreshingApps = false
+                    }
                 } label: {
                     Image(systemName: "arrow.clockwise")
+                        .rotationEffect(.degrees(isRefreshingApps ? 360 : 0))
+                        .animation(.easeInOut(duration: 0.35), value: isRefreshingApps)
                 }
                 .buttonStyle(.bordered)
                 .pointingHandCursor()
@@ -930,6 +955,7 @@ public struct MainDashboardView: View {
 
     private func runningAppRow(for app: RunningAppInfo) -> some View {
         let isWhitelisted = app.isWhitelisted
+        let isHovered = hoveredAppID == app.id
 
         return HStack(spacing: 12) {
             if let icon = app.icon {
@@ -1000,6 +1026,15 @@ public struct MainDashboardView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isHovered ? Color.primary.opacity(0.045) : Color.clear)
+        )
+        .padding(.horizontal, 4)
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
+        .onHover { hovering in
+            hoveredAppID = hovering ? app.id : (hoveredAppID == app.id ? nil : hoveredAppID)
+        }
     }
 
     @ViewBuilder
@@ -1103,6 +1138,8 @@ public struct MainDashboardView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(manager.whitelistedBundleIDs.enumerated()), id: \.element) { index, item in
                             let resolved = resolveApp(item)
+                            let isHovered = hoveredExclusionItem == item
+
                             HStack(spacing: 12) {
                                 if let icon = resolved.icon {
                                     Image(nsImage: icon)
@@ -1140,6 +1177,15 @@ public struct MainDashboardView: View {
                             }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(isHovered ? Color.primary.opacity(0.045) : Color.clear)
+                            )
+                            .padding(.horizontal, 4)
+                            .animation(.easeInOut(duration: 0.12), value: isHovered)
+                            .onHover { hovering in
+                                hoveredExclusionItem = hovering ? item : (hoveredExclusionItem == item ? nil : hoveredExclusionItem)
+                            }
 
                             if index < manager.whitelistedBundleIDs.count - 1 {
                                 Divider().padding(.horizontal, 14)
@@ -1208,21 +1254,21 @@ public struct MainDashboardView: View {
                     manager.openDiagnosticLogFile()
                 }
                 .buttonStyle(.bordered)
-                .pointerStyle(.link)
+                .pointingHandCursor()
                 .controlSize(.small)
 
                 Button("Reveal in Finder") {
                     manager.revealDiagnosticLogInFinder()
                 }
                 .buttonStyle(.bordered)
-                .pointerStyle(.link)
+                .pointingHandCursor()
                 .controlSize(.small)
 
                 Button("Clear") {
                     manager.clearLogs()
                 }
                 .buttonStyle(.bordered)
-                .pointerStyle(.link)
+                .pointingHandCursor()
                 .controlSize(.small)
                 .disabled(manager.activityLogs.isEmpty)
             }
@@ -1237,6 +1283,8 @@ public struct MainDashboardView: View {
                 } else {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(manager.activityLogs.enumerated()), id: \.element.id) { index, entry in
+                            let isHovered = hoveredLogID == entry.id
+
                             HStack(alignment: .top, spacing: 10) {
                                 Circle()
                                     .fill(logLevelColor(entry.level))
@@ -1263,6 +1311,15 @@ public struct MainDashboardView: View {
                             }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 9)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(isHovered ? Color.primary.opacity(0.04) : Color.clear)
+                            )
+                            .padding(.horizontal, 4)
+                            .animation(.easeInOut(duration: 0.12), value: isHovered)
+                            .onHover { hovering in
+                                hoveredLogID = hovering ? entry.id : (hoveredLogID == entry.id ? nil : hoveredLogID)
+                            }
 
                             if index < manager.activityLogs.count - 1 {
                                 Divider().padding(.horizontal, 14)

@@ -147,6 +147,17 @@ if [[ -n "$GH_TOKEN" ]]; then
           -H "Content-Type: text/plain" \
           --data-binary @"$SHA256_FILE" \
           "https://uploads.github.com/repos/msynthnova/AutoHideAgent/releases/$RELEASE_ID/assets?name=AutoHideAgent-macOS-v${NEW_VERSION}.zip.sha256" >/dev/null
+
+        for delta in "$PROJECT_DIR/dist/AutoHideAgent${NEW_BUILD}-"*.delta; do
+            if [[ -f "$delta" ]]; then
+                delta_name=$(basename "$delta")
+                echo "    Uploading Sparkle delta $delta_name to GitHub..."
+                curl -s -X POST -H "Authorization: token $GH_TOKEN" \
+                  -H "Content-Type: application/octet-stream" \
+                  --data-binary @"$delta" \
+                  "https://uploads.github.com/repos/msynthnova/AutoHideAgent/releases/$RELEASE_ID/assets?name=$delta_name" >/dev/null
+            fi
+        done
         echo "    GitHub Release published: https://github.com/msynthnova/AutoHideAgent/releases/tag/v${NEW_VERSION}"
     else
         echo "WARNING: Could not create GitHub release via API. Response: $RELEASE_RESPONSE"
