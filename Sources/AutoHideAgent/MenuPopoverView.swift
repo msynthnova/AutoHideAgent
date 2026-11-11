@@ -53,15 +53,21 @@ public struct MenuPopoverView: View {
     }
 
     public var body: some View {
-        Group {
-            if manager.isAccessibilityTrusted {
-                fullPanelContent
-            } else {
-                setupRequiredPanel
+        VStack(alignment: .leading, spacing: 0) {
+            Group {
+                if manager.isAccessibilityTrusted {
+                    fullPanelContent
+                } else {
+                    setupRequiredPanel
+                }
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in
+                if h > 50 { onHeightChange?(h) }
+            }
+
+            Spacer(minLength: 0)
         }
-        .frame(width: 308)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 308, alignment: .topLeading)
         .background(
             ZStack {
                 ControlCenterVisualEffectBackground()
@@ -69,9 +75,6 @@ public struct MenuPopoverView: View {
             }
         )
         .ignoresSafeArea()
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in
-            if h > 50 { onHeightChange?(h) }
-        }
     }
 
     private var setupRequiredPanel: some View {
@@ -308,7 +311,7 @@ public struct MenuPopoverView: View {
                 manager.isAutoHideEnabled.toggle()
             },
             onRowTap: {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                withAnimation(.easeInOut(duration: 0.22)) {
                     expandedSection = isExpanded ? nil : .autoHide
                 }
             }
@@ -380,7 +383,7 @@ public struct MenuPopoverView: View {
                 manager.isAutoQuitEnabled.toggle()
             },
             onRowTap: {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                withAnimation(.easeInOut(duration: 0.22)) {
                     expandedSection = isExpanded ? nil : .autoQuit
                 }
             }

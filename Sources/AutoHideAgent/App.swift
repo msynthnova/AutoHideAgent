@@ -19,6 +19,37 @@ private final class FirstMouseHostingView<Content: View>: NSHostingView<Content>
     }
 }
 
+/// Container view with flipped coordinates (`isFlipped = true`) so (0, 0) is at the top-left.
+/// Pins the SwiftUI hosting view to the top of the menu panel and prevents `NSHostingView`
+/// from vertically centering its content during height expansion/collapse animations.
+@MainActor
+private final class ControlCenterContentView: NSView {
+    override var isFlipped: Bool { true }
+
+    var targetContentHeight: CGFloat = 356 {
+        didSet {
+            needsLayout = true
+            layoutSubtreeIfNeeded()
+        }
+    }
+
+    weak var hostingView: NSView?
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+
+    override func layout() {
+        super.layout()
+        hostingView?.frame = NSRect(
+            x: 0,
+            y: 0,
+            width: bounds.width,
+            height: max(bounds.height, targetContentHeight)
+        )
+    }
+}
+
 @main
 @MainActor
 public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
@@ -28,6 +59,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private var mainWindow: NSWindow?
     private var statusItem: NSStatusItem?
     private var menuPanel: ControlCenterMenuPanel?
+    private var menuContainerView: ControlCenterContentView?
     private var menuHostingView: FirstMouseHostingView<MenuPopoverView>?
     private var currentMeasuredPanelHeight: CGFloat = 356
     private var lastPanelCloseUptime: TimeInterval = 0
@@ -87,12 +119,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
                     technical: "isKey=\(isKey), isVisible=\(isVis), appActive=\(appActive), frame=\(frameStr)"
                 )
                 if let snapshotPath,
-                   let hostingView = self.menuHostingView {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        hostingView.layoutSubtreeIfNeeded()
-                        let bounds = hostingView.bounds
-                        if let rep = hostingView.bitmapImageRepForCachingDisplay(in: bounds) {
-                            hostingView.cacheDisplay(in: bounds, to: rep)
+                   let containerView = self.menuContainerView {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+                        containerView.layoutSubtreeIfNeeded()
+                        let bounds = containerView.bounds
+                        if let rep = containerView.bitmapImageRepForCachingDisplay(in: bounds) {
+                            containerView.cacheDisplay(in: bounds, to: rep)
                             if let pngData = rep.representation(using: .png, properties: [:]) {
                                 try? pngData.write(to: URL(fileURLWithPath: snapshotPath))
                             }
@@ -353,6 +385,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = false
 
+        let containerView = ControlCenterContentView()
+        containerView.frame = NSRect(x: 0, y: 0, width: 308, height: 356)
+        containerView.autoresizingMask = [.width, .height]
+        containerView.targetContentHeight = 356
+        containerView.wantsLayer = true
+        containerView.layer?.masksToBounds = true
+
         let rootView = MenuPopoverView(
             manager: autoHideManager,
             onOpenMainWindow: { [weak self] in
@@ -366,6 +405,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
                 let roundedHeight = ceil(measuredHeight)
                 if abs(roundedHeight - self.currentMeasuredPanelHeight) > 0.5 {
                     self.currentMeasuredPanelHeight = roundedHeight
+                    self.menuContainerView?.targetContentHeight = roundedHeight
                     self.repositionAndResizeMenuPanel(animated: self.menuPanel?.isVisible == true)
                 }
             }
@@ -374,11 +414,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         let hostingView = FirstMouseHostingView(rootView: rootView)
         hostingView.safeAreaRegions = []
         hostingView.frame = NSRect(x: 0, y: 0, width: 308, height: 356)
-        hostingView.autoresizingMask = [.width, .height]
 
-        panel.contentView = hostingView
+        containerView.hostingView = hostingView
+        containerView.addSubview(hostingView)
+
+        panel.contentView = containerView
         self.menuPanel = panel
         self.menuHostingView = hostingView
+        self.menuContainerView = containerView
     }
 
     private func updateStatusItemAppearance() {
@@ -449,15 +492,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         if menuPanel == nil {
             setupControlCenterMenuPanel()
         }
-        guard let panel = menuPanel, let hostingView = panel.contentView else { return }
+        guard let panel = menuPanel else { return }
 
         isPanelClosing = false
-        hostingView.layer?.removeAllAnimations()
+        panel.contentView?.layer?.removeAllAnimations()
+        menuHostingView?.layer?.removeAllAnimations()
 
-        hostingView.layoutSubtreeIfNeeded()
-        let fittingHeight = ceil(hostingView.fittingSize.height)
-        if fittingHeight > 100 {
-            currentMeasuredPanelHeight = fittingHeight
+        menuHostingView?.layoutSubtreeIfNeeded()
+        if let fittingHeight = menuHostingView?.fittingSize.height, fittingHeight > 100 {
+            currentMeasuredPanelHeight = ceil(fittingHeight)
+            menuContainerView?.targetContentHeight = currentMeasuredPanelHeight
         }
 
         repositionAndResizeMenuPanel(animated: false)
@@ -555,12 +599,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         if screenFrame != .zero {
             originX = max(screenFrame.minX + 8, min(originX, screenFrame.maxX - panelWidth - 8))
         }
-        let originY = round(buttonFrameOnScreen.minY - panelHeight - 5)
+        let topY = round(buttonFrameOnScreen.minY - 5)
+        let originY = topY - panelHeight
         let targetFrame = NSRect(x: originX, y: originY, width: panelWidth, height: panelHeight)
 
         if animated && panel.isVisible {
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.24
+                context.duration = 0.22
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 panel.animator().setFrame(targetFrame, display: true)
             }
