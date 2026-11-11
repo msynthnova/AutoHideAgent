@@ -1,6 +1,6 @@
 cask "autohideagent" do
-  version "1.4.5"
-  sha256 "6a0e941d89eb28ddf27250a9406ec0b49221e7b178a7b3f6df02d1381cd9e169"
+  version "1.4.6"
+  sha256 "748d28b4921110fdb57062e7105fa7fa4d152fa55943b0ba089f7f4394f93eb0"
 
   url "https://github.com/msynthnova/AutoHideAgent/releases/download/v#{version}/AutoHideAgent-macOS-v#{version}.zip"
   name "AutoHideAgent"

@@ -32,13 +32,7 @@ public struct MenuPopoverView: View {
     public var onClosePanel: (() -> Void)?
     public var onHeightChange: ((CGFloat) -> Void)?
 
-    @State private var expandedSection: ExpandableMenuSection? = nil
     @State private var hoveredRowID: String? = nil
-
-    private enum ExpandableMenuSection: Equatable {
-        case autoHide
-        case autoQuit
-    }
 
     public init(
         manager: AutoHideManager,
@@ -163,20 +157,14 @@ public struct MenuPopoverView: View {
 
             hairlineDivider
 
-            // 2. Automation Modes (Control Center Circular Icon Rows + Expandable Sub-Menus)
+            // 2. Automation Modes (Always-Visible Selector Lists)
             sectionHeader("Automation")
                 .padding(.top, 8)
                 .padding(.bottom, 4)
 
-            autoHideControlCenterRow
-            if expandedSection == .autoHide {
-                autoHideExpandedSubmenu
-            }
+            autoHideSectionBlock
 
-            autoQuitControlCenterRow
-            if expandedSection == .autoQuit {
-                autoQuitExpandedSubmenu
-            }
+            autoQuitSectionBlock
 
             snoozeControlCenterRow
                 .padding(.bottom, 6)
@@ -231,20 +219,6 @@ public struct MenuPopoverView: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 6)
         }
-        .onReceive(
-            DistributedNotificationCenter.default().publisher(
-                for: NSNotification.Name("com.example.AutoHideAgent.debugSetExpandedSection")
-            )
-        ) { notification in
-            guard autoHideDebugHooksEnabled else { return }
-            if let mode = notification.object as? String {
-                switch mode {
-                case "autoHide": expandedSection = .autoHide
-                case "autoQuit": expandedSection = .autoQuit
-                default: expandedSection = nil
-                }
-            }
-        }
     }
 
     // MARK: - 1. Control Center Header
@@ -290,43 +264,36 @@ public struct MenuPopoverView: View {
         return "Active"
     }
 
-    // MARK: - 2. Expandable Control Center Rows (Like AirPods Pro -> Listening Mode)
+    // MARK: - 2. Always-Visible Control Center Blocks (No Accordion)
 
-    private var autoHideControlCenterRow: some View {
-        let isActive = manager.isEnabled && manager.isAutoHideEnabled
-        let currentLabel = TimeoutPreset(rawValue: manager.timeoutSeconds)?.label ?? "\(manager.timeoutSeconds / 60)m"
-        let isExpanded = (expandedSection == .autoHide)
-
-        return controlCenterItemRow(
-            id: "row.autoHide",
-            icon: "eye.slash.fill",
-            isActive: isActive,
-            activeTint: .accentColor,
-            title: "Auto-Hide Apps",
-            subtitle: isActive ? "After \(currentLabel) of inactivity" : "Off",
-            showsChevron: true,
-            isExpanded: isExpanded,
-            onIconTap: {
-                if !manager.isEnabled { manager.isEnabled = true }
-                manager.isAutoHideEnabled.toggle()
-            },
-            onRowTap: {
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    expandedSection = isExpanded ? nil : .autoHide
+    private var autoHideSectionBlock: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            controlCenterHeaderToggleRow(
+                id: "header.autoHide",
+                icon: "eye.slash.fill",
+                isActive: manager.isEnabled && manager.isAutoHideEnabled,
+                activeTint: .accentColor,
+                title: "Auto-Hide Apps",
+                subtitle: (manager.isEnabled && manager.isAutoHideEnabled) ? "Hide inactive apps after:" : "Disabled",
+                isOn: Binding(
+                    get: { manager.isEnabled && manager.isAutoHideEnabled },
+                    set: { newValue in
+                        if !manager.isEnabled && newValue { manager.isEnabled = true }
+                        manager.isAutoHideEnabled = newValue
+                    }
+                ),
+                onIconTap: {
+                    if !manager.isEnabled { manager.isEnabled = true }
+                    manager.isAutoHideEnabled.toggle()
                 }
-            }
-        )
+            )
+
+            autoHideSubmenuList
+        }
     }
 
-    private var autoHideExpandedSubmenu: some View {
+    private var autoHideSubmenuList: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text("Hide Inactive Apps After")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
-                .padding(.top, 6)
-                .padding(.bottom, 2)
-
             ForEach(TimeoutPreset.allCases) { preset in
                 let isSelected = manager.isAutoHideEnabled && (manager.timeoutSeconds == preset.rawValue)
                 submenuCheckmarkRow(
@@ -358,47 +325,37 @@ public struct MenuPopoverView: View {
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.75)
         )
         .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .transition(.opacity.combined(with: .move(edge: .top)))
+        .padding(.bottom, 6)
     }
 
-    private var autoQuitControlCenterRow: some View {
-        let isActive = manager.isEnabled && manager.isAutoQuitEnabled
-        let currentLabel = QuitTimeoutPreset(rawValue: manager.quitTimeoutSeconds)?.label ?? "\(manager.quitTimeoutSeconds / 3600)h"
-        let isExpanded = (expandedSection == .autoQuit)
-
-        return controlCenterItemRow(
-            id: "row.autoQuit",
-            icon: "power",
-            isActive: isActive,
-            activeTint: .accentColor,
-            title: "Auto-Quit Hidden Apps",
-            subtitle: isActive
-                ? "After \(currentLabel) • \(manager.confirmBeforeAutoQuit ? "Ask first" : "Automatic")"
-                : "Off",
-            showsChevron: true,
-            isExpanded: isExpanded,
-            onIconTap: {
-                if !manager.isEnabled { manager.isEnabled = true }
-                manager.isAutoQuitEnabled.toggle()
-            },
-            onRowTap: {
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    expandedSection = isExpanded ? nil : .autoQuit
+    private var autoQuitSectionBlock: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            controlCenterHeaderToggleRow(
+                id: "header.autoQuit",
+                icon: "power",
+                isActive: manager.isEnabled && manager.isAutoQuitEnabled,
+                activeTint: .accentColor,
+                title: "Auto-Quit Hidden Apps",
+                subtitle: (manager.isEnabled && manager.isAutoQuitEnabled) ? "Quit hidden apps after:" : "Disabled",
+                isOn: Binding(
+                    get: { manager.isEnabled && manager.isAutoQuitEnabled },
+                    set: { newValue in
+                        if !manager.isEnabled && newValue { manager.isEnabled = true }
+                        manager.isAutoQuitEnabled = newValue
+                    }
+                ),
+                onIconTap: {
+                    if !manager.isEnabled { manager.isEnabled = true }
+                    manager.isAutoQuitEnabled.toggle()
                 }
-            }
-        )
+            )
+
+            autoQuitSubmenuList
+        }
     }
 
-    private var autoQuitExpandedSubmenu: some View {
+    private var autoQuitSubmenuList: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text("Quit Hidden Apps After")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
-                .padding(.top, 6)
-                .padding(.bottom, 2)
-
             ForEach(QuitTimeoutPreset.allCases) { preset in
                 let isSelected = manager.isAutoQuitEnabled && (manager.quitTimeoutSeconds == preset.rawValue)
                 submenuCheckmarkRow(
@@ -436,8 +393,7 @@ public struct MenuPopoverView: View {
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.75)
         )
         .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .transition(.opacity.combined(with: .move(edge: .top)))
+        .padding(.bottom, 6)
     }
 
     private var confirmationCheckboxRow: some View {
@@ -483,8 +439,6 @@ public struct MenuPopoverView: View {
             activeTint: .orange,
             title: isSnoozed ? "Snoozed for 1 Hour" : "Pause for 1 Hour",
             subtitle: isSnoozed ? "Click to resume timers now" : "Temporarily freeze all timers",
-            showsChevron: false,
-            isExpanded: false,
             onIconTap: {
                 manager.togglePauseForOneHour()
             },
@@ -509,8 +463,6 @@ public struct MenuPopoverView: View {
             activeTint: .accentColor,
             title: "Hide Other Open Apps Now",
             subtitle: subtitleText,
-            showsChevron: false,
-            isExpanded: false,
             onIconTap: {
                 onClosePanel?()
                 manager.hideAllBackgroundAppsNow()
@@ -540,22 +492,19 @@ public struct MenuPopoverView: View {
     }
 
     @ViewBuilder
-    private func controlCenterItemRow(
+    private func controlCenterHeaderToggleRow(
         id: String,
         icon: String,
         isActive: Bool,
         activeTint: Color,
         title: String,
         subtitle: String,
-        showsChevron: Bool,
-        isExpanded: Bool,
-        onIconTap: @escaping () -> Void,
-        onRowTap: @escaping () -> Void
+        isOn: Binding<Bool>,
+        onIconTap: @escaping () -> Void
     ) -> some View {
         let isHovered = (hoveredRowID == id)
 
         HStack(spacing: 10) {
-            // Circular Status Badge (tappable directly to toggle on/off like Wi-Fi / Bluetooth / AirPods)
             Button(action: onIconTap) {
                 ZStack {
                     Circle()
@@ -571,7 +520,68 @@ public struct MenuPopoverView: View {
             .buttonStyle(TactileButtonStyle(pressedScale: 0.92, pressedOpacity: 0.8))
             .pointerStyle(.link)
 
-            // Main Row Area (toggles action or expands submenu)
+            VStack(alignment: .leading, spacing: 1.5) {
+                Text(title)
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text(subtitle)
+                    .font(.system(size: 10.5, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 4)
+
+            Toggle("", isOn: isOn)
+                .toggleStyle(.switch)
+                .pointerStyle(.link)
+                .controlSize(.small)
+                .labelsHidden()
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(isHovered ? Color.primary.opacity(0.085) : Color.clear)
+        )
+        .padding(.horizontal, 6)
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
+        .onHover { hovering in
+            hoveredRowID = hovering ? id : (hoveredRowID == id ? nil : hoveredRowID)
+        }
+    }
+
+    @ViewBuilder
+    private func controlCenterItemRow(
+        id: String,
+        icon: String,
+        isActive: Bool,
+        activeTint: Color,
+        title: String,
+        subtitle: String,
+        onIconTap: @escaping () -> Void,
+        onRowTap: @escaping () -> Void
+    ) -> some View {
+        let isHovered = (hoveredRowID == id)
+
+        HStack(spacing: 10) {
+            Button(action: onIconTap) {
+                ZStack {
+                    Circle()
+                        .fill(isActive ? activeTint : Color.primary.opacity(0.11))
+                        .frame(width: 28, height: 28)
+                        .animation(.easeInOut(duration: 0.2), value: isActive)
+
+                    Image(systemName: icon)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(isActive ? Color.white : Color.primary.opacity(0.85))
+                }
+            }
+            .buttonStyle(TactileButtonStyle(pressedScale: 0.92, pressedOpacity: 0.8))
+            .pointerStyle(.link)
+
             Button(action: onRowTap) {
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 1.5) {
@@ -587,14 +597,6 @@ public struct MenuPopoverView: View {
                     }
 
                     Spacer(minLength: 4)
-
-                    if showsChevron {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10.5, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                            .animation(.spring(response: 0.28, dampingFraction: 0.82), value: isExpanded)
-                    }
                 }
                 .contentShape(Rectangle())
             }

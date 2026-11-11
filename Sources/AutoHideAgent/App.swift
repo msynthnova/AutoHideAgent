@@ -61,7 +61,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private var menuPanel: ControlCenterMenuPanel?
     private var menuContainerView: ControlCenterContentView?
     private var menuHostingView: FirstMouseHostingView<MenuPopoverView>?
-    private var currentMeasuredPanelHeight: CGFloat = 356
+    private var currentMeasuredPanelHeight: CGFloat = 660
     private var lastPanelCloseUptime: TimeInterval = 0
     private var isPanelClosing: Bool = false
     private var globalClickMonitor: Any?
@@ -144,11 +144,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
                 guard let self, let snapshotPath else { return }
                 self.showMainWindow()
                 guard let contentView = self.mainWindow?.contentView else { return }
+                let targetView = contentView.superview ?? contentView
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    contentView.layoutSubtreeIfNeeded()
-                    let bounds = contentView.bounds
-                    if let rep = contentView.bitmapImageRepForCachingDisplay(in: bounds) {
-                        contentView.cacheDisplay(in: bounds, to: rep)
+                    targetView.layoutSubtreeIfNeeded()
+                    let bounds = targetView.bounds
+                    if let rep = targetView.bitmapImageRepForCachingDisplay(in: bounds) {
+                        targetView.cacheDisplay(in: bounds, to: rep)
                         if let pngData = rep.representation(using: .png, properties: [:]) {
                             try? pngData.write(to: URL(fileURLWithPath: snapshotPath))
                         }
@@ -270,6 +271,32 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
         self.mainWindow = window
         showMainWindow()
+        configureNonCollapsibleSidebar()
+    }
+
+    private func configureNonCollapsibleSidebar() {
+        guard mainWindow != nil else { return }
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, let window = self.mainWindow, let contentView = window.contentView else { return }
+                @MainActor func findSplitView(in view: NSView) -> NSSplitView? {
+                    if let sv = view as? NSSplitView { return sv }
+                    for sub in view.subviews {
+                        if let found = findSplitView(in: sub) { return found }
+                    }
+                    return nil
+                }
+                if let sv = findSplitView(in: contentView), let svc = sv.delegate as? NSSplitViewController {
+                    if let sidebarItem = svc.splitViewItems.first {
+                        sidebarItem.canCollapse = false
+                        sidebarItem.minimumThickness = 230
+                        if sidebarItem.viewController.view.frame.width < 230 {
+                            sv.setPosition(245, ofDividerAt: 0)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     public func showMainWindow() {
@@ -366,7 +393,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     private func setupControlCenterMenuPanel() {
         let panel = ControlCenterMenuPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 308, height: 356),
+            contentRect: NSRect(x: 0, y: 0, width: 308, height: 660),
             styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -386,9 +413,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         panel.becomesKeyOnlyIfNeeded = false
 
         let containerView = ControlCenterContentView()
-        containerView.frame = NSRect(x: 0, y: 0, width: 308, height: 356)
+        containerView.frame = NSRect(x: 0, y: 0, width: 308, height: 660)
         containerView.autoresizingMask = [.width, .height]
-        containerView.targetContentHeight = 356
+        containerView.targetContentHeight = 660
         containerView.wantsLayer = true
         containerView.layer?.masksToBounds = true
 
@@ -413,7 +440,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
         let hostingView = FirstMouseHostingView(rootView: rootView)
         hostingView.safeAreaRegions = []
-        hostingView.frame = NSRect(x: 0, y: 0, width: 308, height: 356)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 308, height: 660)
 
         containerView.hostingView = hostingView
         containerView.addSubview(hostingView)

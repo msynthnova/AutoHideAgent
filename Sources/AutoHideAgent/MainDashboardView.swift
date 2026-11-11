@@ -237,12 +237,15 @@ public struct MainDashboardView: View {
     }
 
     private var mainContent: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: .constant(.all)) {
             sidebarView
-                .navigationSplitViewColumnWidth(min: 220, ideal: 235, max: 260)
+                .navigationSplitViewColumnWidth(min: 240, ideal: 255, max: 290)
+                .toolbar(removing: .sidebarToggle)
         } detail: {
             detailCanvas
+                .toolbar(removing: .sidebarToggle)
         }
+        .toolbar(removing: .sidebarToggle)
         .frame(minWidth: 840, idealWidth: 960, minHeight: 560, idealHeight: 620)
         .onAppear {
             manager.refreshRunningApps()
@@ -331,6 +334,7 @@ public struct MainDashboardView: View {
                     )
                     Text(section.rawValue)
                         .lineLimit(1)
+                        .layoutPriority(1)
                 }
                 .padding(.vertical, 2)
                 .badge(badgeCount(for: section))
@@ -808,8 +812,8 @@ public struct MainDashboardView: View {
     }
 
     private var currentAppVersionDisplay: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.4.5"
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "12"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.4.6"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "13"
         return "v\(version) (Build \(build))"
     }
 
