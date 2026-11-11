@@ -1598,4 +1598,17 @@ public final class AutoHideManager {
         let result = AXUIElementSetAttributeValue(axApp, kAXHiddenAttribute as CFString, kCFBooleanTrue)
         return (result == .success) ? .hidden : .failed(result)
     }
+
+    isolated deinit {
+        stopEvaluationTimer()
+        accessibilityPollTimer?.invalidate()
+        let nc = NSWorkspace.shared.notificationCenter
+        for observer in workspaceObservers {
+            nc.removeObserver(observer)
+        }
+        let dnc = DistributedNotificationCenter.default()
+        for observer in distributedObservers {
+            dnc.removeObserver(observer)
+        }
+    }
 }

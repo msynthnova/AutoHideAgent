@@ -412,6 +412,7 @@ public struct MainDashboardView: View {
             .padding(.vertical, 22)
             .frame(maxWidth: .infinity, alignment: selectedSection == .overview ? .center : .leading)
         }
+        .background(Color(nsColor: .windowBackgroundColor))
         // Fresh scroll view per tab so switching tabs always starts at the top
         // instead of inheriting a scroll offset from a longer tab.
         .id(selectedSection)
@@ -1176,9 +1177,8 @@ public struct MainDashboardView: View {
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
         guard panel.runModal() == .OK else { return }
         for url in panel.urls {
-            if let bundleID = Bundle(url: url)?.bundleIdentifier {
-                manager.addWhitelistEntry(bundleID)
-            }
+            let identifier = Bundle(url: url)?.bundleIdentifier ?? url.deletingPathExtension().lastPathComponent
+            manager.addWhitelistEntry(identifier)
         }
     }
 
