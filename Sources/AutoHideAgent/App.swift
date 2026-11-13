@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UserNotifications
 
 /// Native Control Center floating panel (like macOS Sound / Wi-Fi menu panels).
 /// Uses `[.titled, .fullSizeContentView, .nonactivatingPanel]` with hidden titlebar buttons so
@@ -95,19 +96,32 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             self?.applyAppearanceModes(initialLaunch: false)
         }
 
+        if Bundle.main.bundleIdentifier != nil && Bundle.main.bundleURL.pathExtension == "app" {
+            UNUserNotificationCenter.current().delegate = self
+            if autoHideManager.alertOnAppHide || autoHideManager.alertOnAppQuit {
+                autoHideManager.requestNotificationPermissionIfNeeded()
+            }
+        }
+
         // Allow automated UI verification (only when launched with AUTOHIDE_DEBUG=1)
         if autoHideDebugHooksEnabled { installDebugHooks() }
     }
 
     private func installDebugHooks() {
+        let prefix = autoHideManager.isDevBuild ? "com.systems.autohideagent.dev" : "com.systems.autohideagent"
+
         DistributedNotificationCenter.default().addObserver(
-            forName: NSNotification.Name("com.example.AutoHideAgent.debugOpenMenuPanel"),
+            forName: NSNotification.Name("\(prefix).debugOpenMenuPanel"),
             object: nil,
             queue: .main
         ) { [weak self] notification in
             let snapshotPath = notification.object as? String
             MainActor.assumeIsolated {
-                guard let self, let button = self.statusItem?.button else { return }
+                guard let self else { return }
+                if self.statusItem == nil {
+                    self.autoHideManager.showInMenuBar = true
+                }
+                guard let button = self.statusItem?.button else { return }
                 self.openMenuPanel(relativeTo: button)
                 let isKey = self.menuPanel?.isKeyWindow ?? false
                 let isVis = self.menuPanel?.isVisible ?? false
@@ -135,7 +149,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         }
 
         DistributedNotificationCenter.default().addObserver(
-            forName: NSNotification.Name("com.example.AutoHideAgent.debugSnapshotMainWindow"),
+            forName: NSNotification.Name("\(prefix).debugSnapshotMainWindow"),
             object: nil,
             queue: .main
         ) { [weak self] notification in
@@ -159,12 +173,24 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         }
 
         DistributedNotificationCenter.default().addObserver(
-            forName: NSNotification.Name("com.example.AutoHideAgent.debugCheckUpdates"),
+            forName: NSNotification.Name("\(prefix).debugCheckUpdates"),
             object: nil,
             queue: .main
         ) { _ in
             MainActor.assumeIsolated {
                 UpdateController.shared.checkForUpdates()
+            }
+        }
+
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("\(prefix).debugPause"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let str = notification.object as? String
+            let seconds = Double(str ?? "3600") ?? 3600
+            MainActor.assumeIsolated {
+                self?.autoHideManager.pause(for: seconds)
             }
         }
     }
@@ -258,7 +284,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             backing: .buffered,
             defer: false
         )
-        window.title = "AutoHideAgent"
+        let appTitle = autoHideManager.isDevBuild ? "AutoHideAgent Dev" : "AutoHideAgent"
+        window.title = autoHideManager.isDryRunMode ? "\(appTitle) (Dry Run)" : appTitle
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.toolbarStyle = .unified
@@ -675,5 +702,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             NSEvent.removeMonitor(keyMonitor)
             localKeyMonitor = nil
         }
+    }
+}
+
+// MARK: - UNUserNotificationCenterDelegate
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    public nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound])
     }
 }

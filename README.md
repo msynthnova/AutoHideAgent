@@ -31,11 +31,11 @@ brew upgrade --cask --greedy autohideagent
 
 ### Method C: Manual ZIP Download
 
-- **Release Archive:** [`dist/AutoHideAgent-macOS-v1.4.6.zip`](./dist/AutoHideAgent-macOS-v1.4.6.zip)
-- **SHA-256 Checksum:** [`dist/AutoHideAgent-macOS-v1.4.6.zip.sha256`](./dist/AutoHideAgent-macOS-v1.4.6.zip.sha256)
+- **Release Archive:** [`dist/AutoHideAgent-macOS-v1.4.7.zip`](./dist/AutoHideAgent-macOS-v1.4.7.zip)
+- **SHA-256 Checksum:** [`dist/AutoHideAgent-macOS-v1.4.7.zip.sha256`](./dist/AutoHideAgent-macOS-v1.4.7.zip.sha256)
 - **Appcast Feed:** [`appcast.xml`](./appcast.xml)
 
-1. Extract `dist/AutoHideAgent-macOS-v1.4.6.zip`.
+1. Extract `dist/AutoHideAgent-macOS-v1.4.7.zip`.
 2. Move `AutoHideAgent.app` to `/Applications`.
 3. If macOS blocks opening on first launch ("Apple could not verify AutoHideAgent is free of malware"):
    - Click **Done**, open **System Settings → Privacy & Security**, scroll to **Security**, and click **Open Anyway**.
@@ -100,8 +100,8 @@ AutoHideAgent/
 │   └── autohideagent.rb                      # Homebrew Cask formula
 ├── bundle.sh                                 # Build, package, Sparkle sign & Homebrew sync script
 ├── dist/
-│   ├── AutoHideAgent-macOS-v1.4.6.zip        # Signed Release .app archive
-│   └── AutoHideAgent-macOS-v1.4.6.zip.sha256 # SHA-256 checksum
+│   ├── AutoHideAgent-macOS-v1.4.7.zip        # Signed Release .app archive
+│   └── AutoHideAgent-macOS-v1.4.7.zip.sha256 # SHA-256 checksum
 ├── README.md                                 # Comprehensive documentation
 ├── Sources/
 │   └── AutoHideAgent/
@@ -120,16 +120,35 @@ AutoHideAgent/
 ## Building, Testing & Packaging from Source
 
 ### Prerequisites
-- macOS 26.0 / 27.0+ with Xcode / Swift 6 toolchain installed.
+- macOS 15.0 (Sequoia) or later; building requires a Swift 6 toolchain.
 
 ### Commands
 ```bash
 # 1. Run the automated Swift Testing unit test suite
-swift test
+unset SDKROOT && swift test
 
-# 2. Build a Release .app bundle and generate dist/AutoHideAgent-macOS-v1.4.6.zip
+# 2. Build a Release .app bundle and generate dist/AutoHideAgent-macOS-v1.4.7.zip
 ./bundle.sh release
 
 # 3. Build a Debug .app bundle and launch it
-./bundle.sh debug && open ./build/AutoHideAgent.app
+./bundle.sh debug && open "./build/AutoHideAgent Dev.app" --args --dry-run
 ```
+
+### Release preparation and publishing
+
+Development builds use a separate bundle ID, preferences domain, log directory, and
+IPC namespace. Sparkle updates are disabled in development bundles. Use `--dry-run`,
+`AUTOHIDE_DRY_RUN=1`, or `AUTOHIDE_SAFE_MODE=1` to log hide/quit decisions safely.
+
+`./publish.sh patch "Release description"` runs tests, builds and notarizes the app,
+uploads verified assets to a draft, and publishes the release before updating the
+Sparkle feed and Homebrew tap. It requires GitHub authentication (`gh auth login`
+or a token in the environment/Keychain). Signing or notarization failures stop it.
+
+To prepare an archive without publishing:
+```bash
+PREPARE_ONLY=1 ./publish.sh patch "Release description"
+# Resume with the version already recorded in Info.plist:
+PUBLISH_PREPARED=1 ./publish.sh 1.4.7 "Release description"
+```
+Neither command installs or upgrades `/Applications/AutoHideAgent.app`.

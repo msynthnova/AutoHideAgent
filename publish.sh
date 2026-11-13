@@ -66,7 +66,15 @@ case "$BUMP_TYPE" in
         ;;
 esac
 
-NEW_BUILD=$((CURRENT_BUILD + 1))
+if [[ "${PUBLISH_PREPARED:-0}" == "1" ]]; then
+    if [[ "$NEW_VERSION" != "$CURRENT_VERSION" ]]; then
+        echo "ERROR: Prepared version must match Info.plist." >&2
+        exit 1
+    fi
+    NEW_BUILD="$CURRENT_BUILD"
+else
+    NEW_BUILD=$((CURRENT_BUILD + 1))
+fi
 
 if [[ -z "$RELEASE_DESC" ]]; then
     read -r "RELEASE_DESC?Enter brief release description: "
@@ -80,9 +88,18 @@ echo " Publishing AutoHideAgent v${NEW_VERSION} (Build ${NEW_BUILD})"
 echo " Description: ${RELEASE_DESC}"
 echo "=========================================================="
 
+# Validate credentials and version before changing release files.
+if [[ "${PREPARE_ONLY:-0}" != "1" ]]; then
+    python3 "$PROJECT_DIR/scripts/github_release.py" preflight "$NEW_VERSION"
+fi
+if git -C "$PROJECT_DIR" rev-parse "v${NEW_VERSION}" >/dev/null 2>&1; then
+    echo "ERROR: Release tag v${NEW_VERSION} already exists." >&2
+    exit 1
+fi
+
 # 2. Run automated test suite first
 echo "==> Step 1/6: Running test suite..."
-swift test --package-path "$PROJECT_DIR"
+env -u SDKROOT swift test --package-path "$PROJECT_DIR"
 
 # 3. Bump version in files
 echo "==> Step 2/6: Bumping version to $NEW_VERSION (Build $NEW_BUILD)..."
@@ -106,88 +123,43 @@ if [[ ! -f "$DIST_ZIP" || ! -f "$SHA256_FILE" ]]; then
 fi
 SHA256_VAL=$(awk '{print $1}' "$SHA256_FILE")
 
-# 5. Git Commit and Tag in AutoHideAgent
+if [[ "${PREPARE_ONLY:-0}" == "1" ]]; then
+    echo "Prepared notarized v${NEW_VERSION} (Build ${NEW_BUILD}); not published."
+    echo "Resume: PUBLISH_PREPARED=1 ./publish.sh $NEW_VERSION <release-description>"
+    exit 0
+fi
+
+# 5. Commit the complete, tested implementation and tag locally.
 echo "==> Step 4/6: Committing and tagging release in git..."
 cd "$PROJECT_DIR"
-git add Casks/ Info.plist README.md Sources/ appcast.xml bundle.sh publish.sh DEVELOPMENT.md .agentrules dist/AutoHideAgent-macOS-v${NEW_VERSION}.zip dist/AutoHideAgent-macOS-v${NEW_VERSION}.zip.sha256
-git commit -m "Release v${NEW_VERSION}: ${RELEASE_DESC}"
-git push origin main
-
+git add Casks/ Info.plist README.md Sources/ Tests/ scripts/ appcast.xml bundle.sh publish.sh DEVELOPMENT.md .agentrules "$DIST_ZIP" "$SHA256_FILE"
+if ! git diff --cached --quiet; then
+    git commit -m "Release v${NEW_VERSION}: ${RELEASE_DESC}"
+fi
 git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}: ${RELEASE_DESC}"
-git push origin "v${NEW_VERSION}"
 
-# 6. Publish GitHub Release via API
-echo "==> Step 5/6: Publishing GitHub release and uploading assets..."
-GH_TOKEN=$(printf "protocol=https\nhost=github.com\n\n" | git credential-osxkeychain get 2>/dev/null | sed -n 's/^password=//p' || true)
-if [[ -z "$GH_TOKEN" && -n "${GITHUB_TOKEN:-}" ]]; then
-    GH_TOKEN="$GITHUB_TOKEN"
-fi
+# Upload all assets to a draft first; fail on any API or upload error.
+echo "==> Step 5/6: Uploading and publishing GitHub release..."
+python3 "$PROJECT_DIR/scripts/github_release.py" upload "$NEW_VERSION" "$NEW_BUILD" "$RELEASE_DESC" "$SHA256_VAL"
+python3 "$PROJECT_DIR/scripts/github_release.py" push "$NEW_VERSION" "$PROJECT_DIR" "v${NEW_VERSION}"
+python3 "$PROJECT_DIR/scripts/github_release.py" publish "$NEW_VERSION"
+# Expose the new Sparkle feed only once the downloads are live.
+python3 "$PROJECT_DIR/scripts/github_release.py" push "$NEW_VERSION" "$PROJECT_DIR" main
 
-if [[ -n "$GH_TOKEN" ]]; then
-    RELEASE_RESPONSE=$(curl -s -X POST -H "Authorization: token $GH_TOKEN" \
-      -H "Accept: application/vnd.github+json" \
-      https://api.github.com/repos/msynthnova/AutoHideAgent/releases \
-      -d "{
-        \"tag_name\": \"v${NEW_VERSION}\",
-        \"name\": \"AutoHideAgent v${NEW_VERSION} (Notarized)\",
-        \"body\": \"## AutoHideAgent v${NEW_VERSION}\\\\n\\\\n- ${RELEASE_DESC}\\\\n\\\\n### Verification\\\\n- **Signed:** Apple Developer ID Application\\\\n- **Notarized:** Apple Notary Service (Ticket stapled)\\\\n- **SHA-256:** \`${SHA256_VAL}\`\"
-      }")
-
-    RELEASE_ID=$(echo "$RELEASE_RESPONSE" | sed -n 's/.*"id": *\([0-9]*\).*/\1/p' | head -n 1)
-
-    if [[ -n "$RELEASE_ID" && "$RELEASE_ID" != "0" ]]; then
-        echo "    Uploading Release ZIP to GitHub..."
-        curl -s -X POST -H "Authorization: token $GH_TOKEN" \
-          -H "Content-Type: application/zip" \
-          --data-binary @"$DIST_ZIP" \
-          "https://uploads.github.com/repos/msynthnova/AutoHideAgent/releases/$RELEASE_ID/assets?name=AutoHideAgent-macOS-v${NEW_VERSION}.zip" >/dev/null
-
-        echo "    Uploading SHA256 checksum to GitHub..."
-        curl -s -X POST -H "Authorization: token $GH_TOKEN" \
-          -H "Content-Type: text/plain" \
-          --data-binary @"$SHA256_FILE" \
-          "https://uploads.github.com/repos/msynthnova/AutoHideAgent/releases/$RELEASE_ID/assets?name=AutoHideAgent-macOS-v${NEW_VERSION}.zip.sha256" >/dev/null
-
-        for delta in "$PROJECT_DIR/dist/AutoHideAgent${NEW_BUILD}-"*.delta; do
-            if [[ -f "$delta" ]]; then
-                delta_name=$(basename "$delta")
-                echo "    Uploading Sparkle delta $delta_name to GitHub..."
-                curl -s -X POST -H "Authorization: token $GH_TOKEN" \
-                  -H "Content-Type: application/octet-stream" \
-                  --data-binary @"$delta" \
-                  "https://uploads.github.com/repos/msynthnova/AutoHideAgent/releases/$RELEASE_ID/assets?name=$delta_name" >/dev/null
-            fi
-        done
-        echo "    GitHub Release published: https://github.com/msynthnova/AutoHideAgent/releases/tag/v${NEW_VERSION}"
-    else
-        echo "WARNING: Could not create GitHub release via API. Response: $RELEASE_RESPONSE"
-    fi
-else
-    echo "WARNING: GitHub token not found in keychain. Skipped automatic GitHub release creation."
-fi
-
-# 7. Update Homebrew Tap
+# 6. Update the tap only after the release assets are public.
 echo "==> Step 6/6: Updating Homebrew tap repository..."
 if [[ -d "$TAP_DIR" ]]; then
-    cd "$TAP_DIR"
-    git add Casks/autohideagent.rb
-    git commit -m "Update autohideagent to v${NEW_VERSION} (Notarized)" || true
-    git push origin main || true
-    echo "    Homebrew tap synced to main."
+    cp "$PROJECT_DIR/Casks/autohideagent.rb" "$TAP_DIR/Casks/autohideagent.rb"
+    git -C "$TAP_DIR" add Casks/autohideagent.rb
+    if ! git -C "$TAP_DIR" diff --cached --quiet; then
+        git -C "$TAP_DIR" commit -m "Update autohideagent to v${NEW_VERSION} (Notarized)"
+    fi
+    python3 "$PROJECT_DIR/scripts/github_release.py" push "$NEW_VERSION" "$TAP_DIR" main
 else
-    echo "WARNING: Homebrew tap directory $TAP_DIR not found."
+    echo "WARNING: Homebrew tap checkout not found; tap was not updated."
 fi
 
-cd "$PROJECT_DIR"
-echo ""
-echo "=========================================================="
-echo " Release v${NEW_VERSION} successfully published!"
-echo " Release ZIP:  $DIST_ZIP"
-echo " SHA-256:      $SHA256_VAL"
-echo " GitHub Tag:   https://github.com/msynthnova/AutoHideAgent/releases/tag/v${NEW_VERSION}"
-echo " Homebrew Tap: https://github.com/msynthnova/homebrew-tap"
-echo ""
-echo " NOTE: /Applications/AutoHideAgent.app was NOT modified."
-echo " To install/upgrade the release yourself as an end user:"
-echo "   brew update && brew upgrade --cask --greedy autohideagent"
-echo "=========================================================="
+echo "Release v${NEW_VERSION} published: https://github.com/msynthnova/AutoHideAgent/releases/tag/v${NEW_VERSION}"
+echo "Release ZIP: $DIST_ZIP"
+echo "SHA-256: $SHA256_VAL"
+echo "/Applications/AutoHideAgent.app was not modified."

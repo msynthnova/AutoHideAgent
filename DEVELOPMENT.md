@@ -111,3 +111,22 @@ Use this when changes are tested, polished, and ready for public download and Ho
 - **Notary Profile:** `notarytool-profile` (Stored via `xcrun notarytool store-credentials`)
 - **Sparkle Private Key:** `.sparkle_priv.key` (Ignored in `.gitignore`, stays local on development machine)
 - **GitHub Token:** Stored in macOS Keychain under `protocol=https host=github.com` (accessed via `git credential-osxkeychain get`)
+
+## November 2026 validation and release updates
+
+- Tests: `unset SDKROOT && swift test` (16 tests). Test managers use isolated
+  preferences, disabled monitoring, and forced dry-run mode.
+- Development bundle: `build/AutoHideAgent Dev.app`; production release bundle:
+  `build/AutoHideAgent.app`. Neither is a symlink to the other.
+- Development bundles cannot install production Sparkle updates.
+- Runtime minimum: macOS 15 (Sequoia), matching Package.swift and Info.plist.
+- GitHub authentication: `gh auth login`, environment token, or macOS Keychain.
+- Prepare without publishing: `PREPARE_ONLY=1 ./publish.sh patch "Description"`.
+- Publish a prepared version without increasing its build again:
+  `PUBLISH_PREPARED=1 ./publish.sh 1.4.7 "Description"`.
+- Release signing, notarization, API calls, asset upload verification, and pushes
+  fail the script on error. Draft assets are uploaded before publication; the
+  Sparkle feed and Homebrew tap are pushed only after downloads are public.
+- Unit tests, Developer ID signing, Apple notarization, Gatekeeper, Sparkle archive
+  and delta signatures, and an isolated development launch smoke test were verified
+  for v1.4.7, Build 14. Full live hide/quit behavior was not exercised on user apps.

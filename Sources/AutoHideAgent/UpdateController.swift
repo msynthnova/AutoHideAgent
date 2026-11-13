@@ -20,6 +20,11 @@ public final class UpdateController: NSObject, ObservableObject, SPUUpdaterDeleg
 
     override private init() {
         super.init()
+        // A development bundle must never install a production update over itself.
+        guard !AppRuntime.isDevelopment, Bundle.main.bundleURL.pathExtension == "app" else {
+            automaticallyChecksForUpdates = false
+            return
+        }
         let controller = SPUStandardUpdaterController(
             startingUpdater: true,
             updaterDelegate: self,
@@ -46,7 +51,7 @@ public final class UpdateController: NSObject, ObservableObject, SPUUpdaterDeleg
     }
 
     public func checkForUpdates() {
-        updaterController.checkForUpdates(nil)
+        updaterController?.checkForUpdates(nil)
     }
 
     public var friendlyLastCheckDate: String {

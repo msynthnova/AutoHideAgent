@@ -7,6 +7,10 @@ set -euo pipefail
 #                          # Apple Notarization & Stapling, Sparkle sign & appcast, and Homebrew cask update
 
 MODE="${1:-debug}"
+if [[ "$MODE" != "debug" && "$MODE" != "release" ]]; then
+    echo "ERROR: Expected debug or release configuration." >&2
+    exit 1
+fi
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Ensure SDKROOT points to a valid directory to prevent xcrun/swift failures
@@ -17,7 +21,17 @@ if [[ -z "${SDKROOT:-}" ]]; then
     export SDKROOT="$(xcrun -sdk macosx --show-sdk-path 2>/dev/null || true)"
 fi
 
-APP_BUNDLE="$PROJECT_DIR/build/AutoHideAgent.app"
+if [[ "$MODE" == "debug" ]]; then
+    BUNDLE_NAME="AutoHideAgent Dev.app"
+    BUNDLE_ID="com.systems.autohideagent.dev"
+    DISPLAY_NAME="AutoHideAgent Dev"
+else
+    BUNDLE_NAME="AutoHideAgent.app"
+    BUNDLE_ID="com.systems.autohideagent"
+    DISPLAY_NAME="AutoHideAgent"
+fi
+
+APP_BUNDLE="$PROJECT_DIR/build/$BUNDLE_NAME"
 CONTENTS_DIR="$APP_BUNDLE/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
@@ -32,12 +46,17 @@ swift build --package-path "$PROJECT_DIR" -c "$MODE"
 BIN_PATH=$(swift build --package-path "$PROJECT_DIR" -c "$MODE" --show-bin-path)
 EXECUTABLE="$BIN_PATH/AutoHideAgent"
 
-echo "==> Stopping any local build instance of AutoHideAgent..."
+echo "==> Stopping any local build instance of AutoHideAgent ($APP_BUNDLE)..."
 pkill -f "$APP_BUNDLE/Contents/MacOS/AutoHideAgent" 2>/dev/null || true
+pkill -f "$PROJECT_DIR/build/AutoHideAgent.app/Contents/MacOS/AutoHideAgent" 2>/dev/null || true
 sleep 0.3
 
 echo "==> Packaging $APP_BUNDLE..."
-rm -rf "$APP_BUNDLE"
+if [[ -L "$APP_BUNDLE" ]]; then
+    rm "$APP_BUNDLE"
+else
+    rm -rf "$APP_BUNDLE"
+fi
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$FRAMEWORKS_DIR"
 
 cp "$EXECUTABLE" "$MACOS_DIR/AutoHideAgent"
@@ -51,6 +70,14 @@ fi
 sed 's/\$(EXECUTABLE_NAME)/AutoHideAgent/g' "$PROJECT_DIR/Info.plist" > "$CONTENTS_DIR/Info.plist"
 echo -n "APPL????" > "$CONTENTS_DIR/PkgInfo"
 
+if [[ "$MODE" == "debug" ]]; then
+    echo "==> Configuring Dev bundle identity ($BUNDLE_ID)..."
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID" "$CONTENTS_DIR/Info.plist" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName $DISPLAY_NAME" "$CONTENTS_DIR/Info.plist" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Set :CFBundleName $DISPLAY_NAME" "$CONTENTS_DIR/Info.plist" 2>/dev/null || true
+
+fi
+
 # Embed Sparkle.framework
 SPARKLE_SOURCE="$PROJECT_DIR/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
 if [[ ! -d "$SPARKLE_SOURCE" ]]; then
@@ -62,7 +89,8 @@ if [[ -d "$SPARKLE_SOURCE" ]]; then
     cp -R "$SPARKLE_SOURCE" "$FRAMEWORKS_DIR/Sparkle.framework"
     install_name_tool -add_rpath @executable_path/../Frameworks "$MACOS_DIR/AutoHideAgent" 2>/dev/null || true
 else
-    echo "WARNING: Sparkle.framework not found in .build directory!"
+    echo "ERROR: Sparkle.framework not found in .build directory!" >&2
+    exit 1
 fi
 
 if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
@@ -71,8 +99,8 @@ if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
 elif [[ "$MODE" == "release" ]]; then
     SIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Developer ID Application" | awk '{print $2}' | head -n 1)
     if [[ -z "$SIGN_IDENTITY" ]]; then
-        SIGN_IDENTITY="-"
-        echo "==> WARNING: Developer ID Application certificate not found. Signing with ad-hoc signature..."
+        echo "ERROR: Release requires a Developer ID Application certificate." >&2
+        exit 1
     else
         echo "==> Signing Release $APP_BUNDLE with Developer ID SHA1: '$SIGN_IDENTITY'..."
     fi
@@ -139,7 +167,7 @@ if [[ "$MODE" == "release" ]]; then
                 echo "==> Stapling notarization ticket to $APP_BUNDLE..."
                 xcrun stapler staple "$APP_BUNDLE"
                 echo "==> Validating Gatekeeper assessment..."
-                spctl --assess --type execute --verbose "$APP_BUNDLE" || true
+                spctl --assess --type execute --verbose "$APP_BUNDLE"
             else
                 echo "==> ERROR: Apple Notarization was NOT accepted."
                 if [[ -n "$SUBMISSION_ID" ]]; then
@@ -149,10 +177,12 @@ if [[ "$MODE" == "release" ]]; then
                 exit 1
             fi
         else
-            echo "==> WARNING: Keychain profile '$NOTARY_PROFILE' not found or invalid. Skipping notarization."
+            echo "ERROR: Notary profile unavailable: $NOTARY_PROFILE" >&2
+            exit 1
         fi
     else
-        echo "==> Non-Developer-ID signature detected ('$SIGN_IDENTITY'). Skipping Apple Notarization."
+        echo "ERROR: Release requires Developer ID signing and notarization." >&2
+        exit 1
     fi
 
     ZIP_PATH="$DIST_DIR/AutoHideAgent-macOS-v${APP_VERSION}.zip"
@@ -169,7 +199,7 @@ if [[ "$MODE" == "release" ]]; then
     if [[ ! -x "$SPARKLE_BIN/sign_update" ]]; then
         echo "==> Fetching Sparkle CLI release tools on demand..."
         mkdir -p "$PROJECT_DIR/tools/sparkle"
-        curl -L -s https://github.com/sparkle-project/Sparkle/releases/download/2.10.1/Sparkle-2.10.1.tar.xz | tar -xJf - -C "$PROJECT_DIR/tools/sparkle" ./bin
+        curl --fail --location --silent --show-error https://github.com/sparkle-project/Sparkle/releases/download/2.10.1/Sparkle-2.10.1.tar.xz | tar -xJf - -C "$PROJECT_DIR/tools/sparkle" ./bin
     fi
 
     if [[ -x "$SPARKLE_BIN/sign_update" ]]; then
@@ -184,15 +214,19 @@ if [[ "$MODE" == "release" ]]; then
         echo "==> Generating appcast.xml..."
         if [[ -f "$PROJECT_DIR/.sparkle_priv.key" ]]; then
             "$SPARKLE_BIN/generate_appcast" \
+                --maximum-versions 0 \
                 --download-url-prefix "https://github.com/msynthnova/AutoHideAgent/releases/download/v${APP_VERSION}/" \
                 --ed-key-file "$PROJECT_DIR/.sparkle_priv.key" \
                 "$DIST_DIR"
         else
             "$SPARKLE_BIN/generate_appcast" \
+                --maximum-versions 0 \
                 --download-url-prefix "https://github.com/msynthnova/AutoHideAgent/releases/download/v${APP_VERSION}/" \
                 --account AutoHideAgent \
                 "$DIST_DIR"
         fi
+
+        python3 "$PROJECT_DIR/scripts/fix_appcast.py" "$DIST_DIR/appcast.xml"
 
         # Sync appcast.xml to repo root for raw GitHub URL access and clean dist/
         if [[ -f "$DIST_DIR/appcast.xml" ]]; then
@@ -216,7 +250,7 @@ cask "autohideagent" do
   homepage "https://github.com/msynthnova/AutoHideAgent"
 
   auto_updates true
-  depends_on macos: :sonoma
+  depends_on macos: :sequoia
 
   app "AutoHideAgent.app"
 
@@ -230,11 +264,7 @@ end
 EOF
     echo "==> Homebrew Cask formula updated at $CASK_FILE"
 
-    LOCAL_TAP_DIR="/opt/homebrew/Library/Taps/msynthnova/homebrew-tap"
-    if [[ -d "$LOCAL_TAP_DIR/Casks" ]]; then
-        cp "$CASK_FILE" "$LOCAL_TAP_DIR/Casks/autohideagent.rb"
-        echo "==> Synced Cask to local Homebrew tap at $LOCAL_TAP_DIR/Casks/autohideagent.rb"
-    fi
+
 fi
 
 echo "==> Release packaging complete. Bundle ready at: $APP_BUNDLE"

@@ -226,9 +226,20 @@ public struct MenuPopoverView: View {
     private var headerBar: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("AutoHideAgent")
-                    .font(.system(size: 13.5, weight: .semibold))
-                    .foregroundStyle(.primary)
+                HStack(spacing: 4) {
+                    Text(manager.isDevBuild ? "AutoHideAgent Dev" : "AutoHideAgent")
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundStyle(.primary)
+
+                    if manager.isDryRunMode {
+                        Text("DRY RUN")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Capsule().fill(Color.orange.opacity(0.18)))
+                    }
+                }
 
                 HStack(spacing: 5) {
                     Circle()
@@ -314,6 +325,12 @@ public struct MenuPopoverView: View {
             ) {
                 manager.isAutoHideEnabled = false
             }
+
+            Divider()
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+
+            alertWhenHiddenCheckboxRow
         }
         .padding(4)
         .background(
@@ -326,6 +343,40 @@ public struct MenuPopoverView: View {
         )
         .padding(.horizontal, 8)
         .padding(.bottom, 6)
+    }
+
+    private var alertWhenHiddenCheckboxRow: some View {
+        let isHovered = (hoveredRowID == "autohide.alert")
+
+        return Button {
+            manager.alertOnAppHide.toggle()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: manager.alertOnAppHide ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(manager.alertOnAppHide ? Color.accentColor : Color.secondary)
+                    .frame(width: 14, alignment: .center)
+
+                Text("Alert When Apps Hide")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4.5)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(isHovered ? Color.primary.opacity(0.09) : Color.clear)
+            )
+        }
+        .buttonStyle(TactileButtonStyle(pressedScale: 0.985, pressedOpacity: 0.78))
+        .pointerStyle(.link)
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
+        .onHover { hovering in
+            hoveredRowID = hovering ? "autohide.alert" : (hoveredRowID == "autohide.alert" ? nil : hoveredRowID)
+        }
     }
 
     private var autoQuitSectionBlock: some View {
@@ -382,6 +433,8 @@ public struct MenuPopoverView: View {
                 .padding(.vertical, 3)
 
             confirmationCheckboxRow
+
+            alertWhenQuitCheckboxRow
         }
         .padding(4)
         .background(
@@ -430,22 +483,176 @@ public struct MenuPopoverView: View {
         }
     }
 
+    private var alertWhenQuitCheckboxRow: some View {
+        let isHovered = (hoveredRowID == "autoquit.alert")
+
+        return Button {
+            manager.alertOnAppQuit.toggle()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: manager.alertOnAppQuit ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(manager.alertOnAppQuit ? Color.accentColor : Color.secondary)
+                    .frame(width: 14, alignment: .center)
+
+                Text("Alert When Apps Quit")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4.5)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(isHovered ? Color.primary.opacity(0.09) : Color.clear)
+            )
+        }
+        .buttonStyle(TactileButtonStyle(pressedScale: 0.985, pressedOpacity: 0.78))
+        .pointerStyle(.link)
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
+        .onHover { hovering in
+            hoveredRowID = hovering ? "autoquit.alert" : (hoveredRowID == "autoquit.alert" ? nil : hoveredRowID)
+        }
+    }
+
     private var snoozeControlCenterRow: some View {
         let isSnoozed = manager.isTemporarilyPaused
-        return controlCenterItemRow(
-            id: "row.snooze",
-            icon: "cup.and.saucer.fill",
-            isActive: isSnoozed,
-            activeTint: .orange,
-            title: isSnoozed ? "Snoozed for 1 Hour" : "Pause for 1 Hour",
-            subtitle: isSnoozed ? "Click to resume timers now" : "Temporarily freeze all timers",
-            onIconTap: {
-                manager.togglePauseForOneHour()
-            },
-            onRowTap: {
-                manager.togglePauseForOneHour()
+        let isHovered = (hoveredRowID == "row.snooze")
+
+        var titleText: String {
+            if isSnoozed, let until = manager.pausedUntilDate, Date.now < until {
+                let remaining = manager.formatFriendlyDuration(until.timeIntervalSinceNow)
+                return "Paused (\(remaining) left)"
             }
+            return "Pause Inactivity Timers"
+        }
+
+        var subtitleText: String {
+            if isSnoozed {
+                return "Click dropdown to change or resume"
+            }
+            return "Temporarily freeze all timers"
+        }
+
+        var pillLabel: String {
+            if isSnoozed {
+                return "Paused"
+            }
+            return manager.currentPausePreset.shortLabel
+        }
+
+        return HStack(spacing: 10) {
+            // Icon button (quick toggle on icon tap)
+            Button {
+                if isSnoozed {
+                    manager.resumeFromTemporaryPause()
+                } else {
+                    manager.pause(for: TimeInterval(manager.pauseDurationSeconds))
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(isSnoozed ? Color.orange : Color.primary.opacity(0.11))
+                        .frame(width: 28, height: 28)
+                        .animation(.easeInOut(duration: 0.2), value: isSnoozed)
+
+                    Image(systemName: "cup.and.saucer.fill")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(isSnoozed ? Color.white : Color.primary.opacity(0.85))
+                }
+            }
+            .buttonStyle(TactileButtonStyle(pressedScale: 0.92, pressedOpacity: 0.8))
+            .pointerStyle(.link)
+            .help(isSnoozed ? "Click to resume timers now" : "Click to pause timers for \(manager.currentPausePreset.descriptiveLabel)")
+
+            // Middle text
+            Button {
+                if isSnoozed {
+                    manager.resumeFromTemporaryPause()
+                } else {
+                    manager.pause(for: TimeInterval(manager.pauseDurationSeconds))
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 1.5) {
+                    Text(titleText)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text(subtitleText)
+                        .font(.system(size: 10.5, weight: .regular))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .buttonStyle(.plain)
+            .pointerStyle(.link)
+
+            Spacer(minLength: 4)
+
+            // Right: Dropdown List Selector
+            Menu {
+                ForEach(PausePreset.allCases) { preset in
+                    Button {
+                        manager.pauseDurationSeconds = preset.rawValue
+                        manager.pause(for: TimeInterval(preset.rawValue))
+                    } label: {
+                        HStack {
+                            Text(preset.descriptiveLabel)
+                            if manager.pauseDurationSeconds == preset.rawValue {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+
+                if isSnoozed {
+                    Divider()
+                    Button {
+                        manager.resumeFromTemporaryPause()
+                    } label: {
+                        Label("Resume Timers Now", systemImage: "play.fill")
+                    }
+                }
+            } label: {
+                HStack(spacing: 3) {
+                    Text(pillLabel)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(isSnoozed ? Color.orange : Color.primary.opacity(0.85))
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(isSnoozed ? Color.orange.opacity(0.8) : Color.secondary)
+                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3.5)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isSnoozed ? Color.orange.opacity(0.18) : Color.primary.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(isSnoozed ? Color.orange.opacity(0.35) : Color.primary.opacity(0.12), lineWidth: 0.5)
+                )
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .pointerStyle(.link)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(isHovered ? Color.primary.opacity(0.085) : Color.clear)
         )
+        .padding(.horizontal, 6)
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
+        .onHover { hovering in
+            hoveredRowID = hovering ? "row.snooze" : (hoveredRowID == "row.snooze" ? nil : hoveredRowID)
+        }
     }
 
     // MARK: - 3. Quick Actions Row

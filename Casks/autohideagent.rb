@@ -1,6 +1,6 @@
 cask "autohideagent" do
-  version "1.4.6"
-  sha256 "748d28b4921110fdb57062e7105fa7fa4d152fa55943b0ba089f7f4394f93eb0"
+  version "1.4.7"
+  sha256 "159341c5ed82beb0eae96e134c93ed4189dc9c78666e25503a8f9fc4556795ab"
 
   url "https://github.com/msynthnova/AutoHideAgent/releases/download/v#{version}/AutoHideAgent-macOS-v#{version}.zip"
   name "AutoHideAgent"
@@ -8,7 +8,7 @@ cask "autohideagent" do
   homepage "https://github.com/msynthnova/AutoHideAgent"
 
   auto_updates true
-  depends_on macos: :sonoma
+  depends_on macos: :sequoia
 
   app "AutoHideAgent.app"
 

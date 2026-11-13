@@ -292,7 +292,7 @@ public struct MainDashboardView: View {
         }
         .onReceive(
             DistributedNotificationCenter.default().publisher(
-                for: NSNotification.Name("com.example.AutoHideAgent.debugSelectSection")
+                for: NSNotification.Name("\(manager.isDevBuild ? "com.systems.autohideagent.dev" : "com.systems.autohideagent").debugSelectSection")
             )
         ) { notification in
             guard autoHideDebugHooksEnabled else { return }
@@ -445,9 +445,20 @@ public struct MainDashboardView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("AutoHideAgent")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.primary)
+                            HStack(spacing: 6) {
+                                Text(manager.isDevBuild ? "AutoHideAgent Dev" : "AutoHideAgent")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.primary)
+
+                                if manager.isDryRunMode {
+                                    Text("DRY RUN")
+                                        .font(.system(size: 9.5, weight: .bold))
+                                        .foregroundStyle(.orange)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 1.5)
+                                        .background(Capsule().fill(Color.orange.opacity(0.18)))
+                                }
+                            }
 
                             Text(masterHeroSubtitle)
                                 .font(.system(size: 12))
@@ -486,16 +497,56 @@ public struct MainDashboardView: View {
                         Spacer(minLength: 8)
 
                         HStack(spacing: 8) {
-                            Button {
-                                manager.togglePauseForOneHour()
+                            if manager.isTemporarilyPaused {
+                                Button {
+                                    manager.resumeFromTemporaryPause()
+                                } label: {
+                                    Label("Resume", systemImage: "play.fill")
+                                        .font(.system(size: 12, weight: .medium))
+                                }
+                                .buttonStyle(.bordered)
+                                .pointerStyle(.link)
+                                .controlSize(.regular)
+                            }
+
+                            Menu {
+                                ForEach(PausePreset.allCases) { preset in
+                                    Button {
+                                        manager.pauseDurationSeconds = preset.rawValue
+                                        manager.pause(for: TimeInterval(preset.rawValue))
+                                    } label: {
+                                        HStack {
+                                            Text("Pause for \(preset.descriptiveLabel)")
+                                            if manager.pauseDurationSeconds == preset.rawValue {
+                                                Image(systemName: "checkmark")
+                                            } else if !manager.isTemporarilyPaused && manager.pauseDurationSeconds == preset.rawValue {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if manager.isTemporarilyPaused {
+                                    Divider()
+                                    Button {
+                                        manager.resumeFromTemporaryPause()
+                                    } label: {
+                                        Label("Resume Timers Now", systemImage: "play.fill")
+                                    }
+                                }
                             } label: {
-                                Label(
-                                    manager.isTemporarilyPaused ? "Resume" : "Pause 1h",
-                                    systemImage: manager.isTemporarilyPaused ? "play.fill" : "pause.fill"
-                                )
+                                HStack(spacing: 4) {
+                                    Image(systemName: manager.isTemporarilyPaused ? "cup.and.saucer.fill" : "pause.circle")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(manager.isTemporarilyPaused ? Color.orange : Color.secondary)
+                                    Text(manager.isTemporarilyPaused ? "Paused (\(manager.formatFriendlyDuration(manager.pausedUntilDate?.timeIntervalSinceNow ?? 0)))" : "Pause Timers…")
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.system(size: 9, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                }
                                 .font(.system(size: 12, weight: .medium))
                             }
-                            .buttonStyle(.bordered)
+                            .menuStyle(.borderedButton)
                             .pointerStyle(.link)
                             .controlSize(.regular)
                             .disabled(!manager.isEnabled)
@@ -568,7 +619,17 @@ public struct MainDashboardView: View {
 
                         Divider().padding(.horizontal, 14)
 
-                        // Row 2: Auto-Quit
+                        // Row 2: Alert When Apps Are Hidden
+                        settingsToggleRow(
+                            title: "Alert When Apps Are Hidden",
+                            subtitle: "Send a system notification whenever an inactive background app is automatically hidden.",
+                            isOn: $manager.alertOnAppHide,
+                            disabled: !manager.isEnabled || !manager.isAutoHideEnabled
+                        )
+
+                        Divider().padding(.horizontal, 14)
+
+                        // Row 3: Auto-Quit
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Auto-Quit Hidden Apps")
@@ -601,11 +662,21 @@ public struct MainDashboardView: View {
 
                         Divider().padding(.horizontal, 14)
 
-                        // Row 3: Ask Confirmation Before Quitting
+                        // Row 4: Ask Confirmation Before Quitting
                         settingsToggleRow(
                             title: "Ask Confirmation Before Auto-Quitting",
                             subtitle: "Show a confirmation dialog before quitting an inactive app so you never lose work.",
                             isOn: $manager.confirmBeforeAutoQuit,
+                            disabled: !manager.isEnabled || !manager.isAutoQuitEnabled
+                        )
+
+                        Divider().padding(.horizontal, 14)
+
+                        // Row 5: Alert When Apps Are Quit
+                        settingsToggleRow(
+                            title: "Alert When Apps Are Quit",
+                            subtitle: "Send a system notification whenever an inactive background app is automatically quit.",
+                            isOn: $manager.alertOnAppQuit,
                             disabled: !manager.isEnabled || !manager.isAutoQuitEnabled
                         )
                     }
@@ -812,8 +883,8 @@ public struct MainDashboardView: View {
     }
 
     private var currentAppVersionDisplay: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.4.6"
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "13"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.4.7"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "14"
         return "v\(version) (Build \(build))"
     }
 
