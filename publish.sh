@@ -100,6 +100,7 @@ fi
 # 2. Run automated test suite first
 echo "==> Step 1/6: Running test suite..."
 env -u SDKROOT swift test --package-path "$PROJECT_DIR"
+python3 -m unittest discover -s "$PROJECT_DIR/scripts/tests" -v
 
 # 3. Bump version in files
 echo "==> Step 2/6: Bumping version to $NEW_VERSION (Build $NEW_BUILD)..."
@@ -132,7 +133,7 @@ fi
 # 5. Commit the complete, tested implementation and tag locally.
 echo "==> Step 4/6: Committing and tagging release in git..."
 cd "$PROJECT_DIR"
-git add Casks/ Info.plist README.md Sources/ Tests/ scripts/ appcast.xml bundle.sh publish.sh DEVELOPMENT.md .agentrules "$DIST_ZIP" "$SHA256_FILE"
+git add Casks/ Info.plist README.md Sources/ Tests/ scripts/ appcast.xml bundle.sh publish.sh DEVELOPMENT.md PERFORMANCE.md benchmarks/ .agentrules "$DIST_ZIP" "$SHA256_FILE"
 if ! git diff --cached --quiet; then
     git commit -m "Release v${NEW_VERSION}: ${RELEASE_DESC}"
 fi

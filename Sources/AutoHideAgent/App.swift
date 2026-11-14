@@ -64,12 +64,23 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     private var menuHostingView: FirstMouseHostingView<MenuPopoverView>?
     private var currentMeasuredPanelHeight: CGFloat = 660
     private var lastPanelCloseUptime: TimeInterval = 0
-    private var isPanelClosing: Bool = false
+    private var menuPresentation = MenuBarPresentationState()
+    private var isPanelClosing: Bool { menuPresentation.panelPhase == .closing }
     private var globalClickMonitor: Any?
     private var localClickMonitor: Any?
     private var localMouseUpMonitor: Any?
     private var localKeyMonitor: Any?
-    private let autoHideManager = AutoHideManager()
+    private var benchmarkObserver: NSObjectProtocol?
+    private let autoHideManager: AutoHideManager = {
+        if AppRuntime.isDevelopment, CommandLine.arguments.contains("--dry-run"),
+           ProcessInfo.processInfo.environment["AUTOHIDE_BENCHMARK_DIRECTORY"] != nil {
+            let defaults = UserDefaults(suiteName: "AutoHideAgent.Benchmark.\(ProcessInfo.processInfo.processIdentifier)")!
+            defaults.set(false, forKey: "com.systems.autohideagent.alertOnAppQuit")
+            defaults.set(true, forKey: "com.systems.autohideagent.showInMenuBar")
+            return AutoHideManager(defaults: defaults, dryRun: true)
+        }
+        return AutoHideManager()
+    }()
 
     // MARK: - Entry Point
 
@@ -100,6 +111,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             UNUserNotificationCenter.current().delegate = self
             if autoHideManager.alertOnAppHide || autoHideManager.alertOnAppQuit {
                 autoHideManager.requestNotificationPermissionIfNeeded()
+            }
+        }
+
+        benchmarkObserver = PerformanceHooks.install(manager: autoHideManager) { [weak self] scene in
+            guard let self else { return }
+            switch scene {
+            case "dashboard": self.showMainWindow()
+            case "menu":
+                self.mainWindow?.orderOut(nil)
+                if let button = self.statusItem?.button { self.openMenuPanel(relativeTo: button) }
+            default:
+                self.closeMenuPanel()
+                self.mainWindow?.orderOut(nil)
             }
         }
 
@@ -182,6 +206,60 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             }
         }
 
+        #if DEBUG
+        // Exercise the actual AppKit lifecycle without scripting Accessibility or
+        // changing another app. Available only in an explicitly enabled safe dev run.
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("\(prefix).debugPresentationAction"),
+            object: nil, queue: .main
+        ) { [weak self] notification in
+            let action = notification.object as? String
+            MainActor.assumeIsolated {
+                guard let self, self.autoHideManager.isDevBuild, self.autoHideManager.isDryRunMode else { return }
+                switch action {
+                case "panel":
+                    if let button = self.statusItem?.button { self.openMenuPanel(relativeTo: button) }
+                case "closePanel": self.closeMenuPanel()
+                case "dashboard": self.showMainWindow()
+                case "minimize": self.mainWindow?.miniaturize(nil)
+                case "closeDashboard": self.mainWindow?.close()
+                case "deactivate": NSApp.deactivate()
+                default: break
+                }
+            }
+        }
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("\(prefix).debugSnapshotPresentation"),
+            object: nil, queue: .main
+        ) { [weak self] notification in
+            let path = notification.object as? String
+            MainActor.assumeIsolated {
+                guard let self, self.autoHideManager.isDevBuild, self.autoHideManager.isDryRunMode,
+                      let path, let button = self.statusItem?.button else { return }
+                // Read the rendered state without updating it, so a missed event is visible.
+                let snapshot: [String: Any] = [
+                    "panelPhase": String(describing: self.menuPresentation.panelPhase),
+                    "panelVisible": self.menuPanel?.isVisible == true,
+                    "dashboardVisible": self.mainWindow?.isVisible == true,
+                    "dashboardKey": self.mainWindow?.isKeyWindow == true,
+                    "dashboardMiniaturized": self.mainWindow?.isMiniaturized == true,
+                    "applicationActive": NSApp.isActive,
+                    "backgroundHighlighted": (button.layer?.backgroundColor?.alpha ?? 0) > 0,
+                    "nativeHighlighted": button.cell?.isHighlighted == true
+                ]
+                if let data = try? JSONSerialization.data(withJSONObject: snapshot, options: [.prettyPrinted, .sortedKeys]) {
+                    try? data.write(to: URL(fileURLWithPath: path))
+                }
+                if let rep = button.bitmapImageRepForCachingDisplay(in: button.bounds) {
+                    button.cacheDisplay(in: button.bounds, to: rep)
+                    if let png = rep.representation(using: .png, properties: [:]) {
+                        try? png.write(to: URL(fileURLWithPath: path + ".png"))
+                    }
+                }
+            }
+        }
+        #endif
+
         DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name("\(prefix).debugPause"),
             object: nil,
@@ -193,6 +271,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
                 self?.autoHideManager.pause(for: seconds)
             }
         }
+    }
+
+    public func applicationWillTerminate(_ notification: Notification) {
+        autoHideManager.finishDiagnosticLog()
+        if let benchmarkObserver { DistributedNotificationCenter.default().removeObserver(benchmarkObserver) }
     }
 
     /// Re-opens the main desktop window when the user clicks the Dock icon if the window was closed.
@@ -285,6 +368,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             defer: false
         )
         let appTitle = autoHideManager.isDevBuild ? "AutoHideAgent Dev" : "AutoHideAgent"
+        window.identifier = NSUserInterfaceItemIdentifier(AppRuntime.dashboardWindowIdentifier)
         window.title = autoHideManager.isDryRunMode ? "\(appTitle) (Dry Run)" : appTitle
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
@@ -438,6 +522,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         panel.isMovable = false
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = false
+        panel.delegate = self
 
         let containerView = ControlCenterContentView()
         containerView.frame = NSRect(x: 0, y: 0, width: 308, height: 660)
@@ -493,8 +578,66 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
         button.image = makeMenuBarIcon(isEnabled: active)
         button.toolTip = description
-        let isPanelOpen = (menuPanel?.isVisible == true)
-        setStatusButtonHighlighted(isPanelOpen)
+        updateStatusButtonHighlight()
+    }
+
+    /// Both presentations share one selection state. A visible background dashboard
+    /// does not select the menu icon; the desktop window must actually have focus.
+    private func updateStatusButtonHighlight(excluding window: NSWindow? = nil) {
+        let dashboardFocused = mainWindow.map {
+            $0 !== window && $0.isVisible && !$0.isMiniaturized && $0.isKeyWindow && NSApp.isActive
+        } ?? false
+        setStatusButtonHighlighted(menuPresentation.shouldHighlight(
+            panelIsVisible: menuPanel?.isVisible == true,
+            dashboardIsFocused: dashboardFocused
+        ))
+    }
+
+    private func refreshStatusButtonHighlightAfterFocusChange() {
+        updateStatusButtonHighlight()
+        // AppKit may update the status button or key window later in this event.
+        DispatchQueue.main.async { [weak self] in
+            self?.updateStatusButtonHighlight()
+        }
+    }
+
+    public func applicationDidBecomeActive(_ notification: Notification) {
+        refreshStatusButtonHighlightAfterFocusChange()
+    }
+
+    public func applicationDidResignActive(_ notification: Notification) {
+        refreshStatusButtonHighlightAfterFocusChange()
+    }
+
+    public func applicationDidHide(_ notification: Notification) {
+        refreshStatusButtonHighlightAfterFocusChange()
+    }
+
+    public func applicationDidUnhide(_ notification: Notification) {
+        refreshStatusButtonHighlightAfterFocusChange()
+    }
+
+    public func windowDidBecomeKey(_ notification: Notification) {
+        refreshStatusButtonHighlightAfterFocusChange()
+    }
+
+    public func windowDidResignKey(_ notification: Notification) {
+        refreshStatusButtonHighlightAfterFocusChange()
+    }
+
+    public func windowDidMiniaturize(_ notification: Notification) {
+        refreshStatusButtonHighlightAfterFocusChange()
+    }
+
+    public func windowDidDeminiaturize(_ notification: Notification) {
+        refreshStatusButtonHighlightAfterFocusChange()
+    }
+
+    public func windowWillClose(_ notification: Notification) {
+        updateStatusButtonHighlight(excluding: notification.object as? NSWindow)
+        DispatchQueue.main.async { [weak self] in
+            self?.updateStatusButtonHighlight()
+        }
     }
 
     private func setStatusButtonHighlighted(_ highlighted: Bool) {
@@ -548,7 +691,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         }
         guard let panel = menuPanel else { return }
 
-        isPanelClosing = false
+        menuPresentation.openPanel()
         panel.contentView?.layer?.removeAllAnimations()
         menuHostingView?.layer?.removeAllAnimations()
 
@@ -577,24 +720,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             panel.animator().alphaValue = 1.0
         }
 
-        // Keep the menu bar icon background pill highlighted while the panel is open
-        setStatusButtonHighlighted(true)
-        DispatchQueue.main.async { [weak self] in
-            if self?.menuPanel?.isVisible == true {
-                self?.setStatusButtonHighlighted(true)
-            }
-        }
+        refreshStatusButtonHighlightAfterFocusChange()
 
-        // Re-assert status bar button highlight on mouseUp (since NSStatusBarButton clears highlight on mouseUp)
+        // Mouse-up clears AppKit's pressed appearance; reapply the current shared
+        // state, rather than capturing an obsolete "panel open" value.
         if localMouseUpMonitor == nil {
             localMouseUpMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] event in
                 MainActor.assumeIsolated {
-                    guard let self, self.menuPanel?.isVisible == true else { return }
-                    DispatchQueue.main.async {
-                        if self.menuPanel?.isVisible == true {
-                            self.setStatusButtonHighlighted(true)
-                        }
-                    }
+                    self?.refreshStatusButtonHighlightAfterFocusChange()
                 }
                 return event
             }
@@ -669,9 +802,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     }
 
     private func closeMenuPanel() {
-        setStatusButtonHighlighted(false)
         if let panel = menuPanel, panel.isVisible, !isPanelClosing {
-            isPanelClosing = true
+            let transitionID = menuPresentation.beginClosingPanel()
+            updateStatusButtonHighlight()
             lastPanelCloseUptime = ProcessInfo.processInfo.systemUptime
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.12
@@ -679,13 +812,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
                 panel.animator().alphaValue = 0.0
             } completionHandler: { [weak self] in
                 MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.isPanelClosing = false
+                    guard let self,
+                          self.menuPresentation.finishClosingPanel(transitionID: transitionID) else { return }
                     panel.orderOut(nil)
                     panel.alphaValue = 1.0
+                    self.refreshStatusButtonHighlightAfterFocusChange()
                 }
             }
         }
+        updateStatusButtonHighlight()
         if let monitor = globalClickMonitor {
             NSEvent.removeMonitor(monitor)
             globalClickMonitor = nil

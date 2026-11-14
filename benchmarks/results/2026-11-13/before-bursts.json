@@ -1,0 +1,150 @@
+{
+  "platform": "macOS-27.3-arm64-arm-64bit",
+  "architecture": "arm64",
+  "configuration": "optimized development bundle, dry-run",
+  "executableSHA256": "a7bb6cb2b725f84f8d2cd168af28ba6c2923cd5fe4eaa5cd21723ac3d2148d6b",
+  "durationSeconds": 20,
+  "repetitions": 3,
+  "scenarios": [
+    "refreshBurst",
+    "logBurst"
+  ],
+  "complete": true,
+  "samplingNote": "Steady-state memory sampled every 500 ms; burst memory sampled every 20 ms. Sampled peaks may miss shorter transients.",
+  "cpuDefinition": "100% = one CPU core; Mach timebase converted delta user+system CPU divided by wall time",
+  "cpuTickSeconds": 4.166666666666666e-08,
+  "records": [
+    {
+      "scenario": "refreshBurst",
+      "trial": 1,
+      "wallSeconds": 0.3843030829999998,
+      "cpuSeconds": 0.15811308333333332,
+      "cpuPercent": 41.142808977500025,
+      "rssMiBMedian": 117.328125,
+      "rssMiBPeak": 117.453125,
+      "footprintMiBMedian": 52.40721130371094,
+      "footprintMiBPeak": 52.50096130371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 1000,
+        "evaluationCallbacks": 0,
+        "logEntries": 0,
+        "powerAssertionQueries": 1000,
+        "refreshRequests": 1000
+      },
+      "mainThreadMilliseconds": 208.71508333220845,
+      "completedMilliseconds": 368.898791661195,
+      "iterations": 1000
+    },
+    {
+      "scenario": "logBurst",
+      "trial": 1,
+      "wallSeconds": 0.3090048749999994,
+      "cpuSeconds": 0.12748125,
+      "cpuPercent": 41.25541708686642,
+      "rssMiBMedian": 117.484375,
+      "rssMiBPeak": 117.484375,
+      "footprintMiBMedian": 52.50096130371094,
+      "footprintMiBPeak": 52.50096130371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 0,
+        "evaluationCallbacks": 0,
+        "logEntries": 1000,
+        "powerAssertionQueries": 0,
+        "refreshRequests": 0
+      },
+      "mainThreadMilliseconds": 126.50379166007042,
+      "completedMilliseconds": 278.86783333087806,
+      "iterations": 1000
+    },
+    {
+      "scenario": "refreshBurst",
+      "trial": 2,
+      "wallSeconds": 0.38426245900000033,
+      "cpuSeconds": 0.15441904166666665,
+      "cpuPercent": 40.18582561214144,
+      "rssMiBMedian": 117.34375,
+      "rssMiBPeak": 117.375,
+      "footprintMiBMedian": 52.36033630371094,
+      "footprintMiBPeak": 52.39158630371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 1000,
+        "evaluationCallbacks": 0,
+        "logEntries": 0,
+        "powerAssertionQueries": 1000,
+        "refreshRequests": 1000
+      },
+      "mainThreadMilliseconds": 202.4047500017332,
+      "completedMilliseconds": 359.67254166462226,
+      "iterations": 1000
+    },
+    {
+      "scenario": "logBurst",
+      "trial": 2,
+      "wallSeconds": 0.31327420800000016,
+      "cpuSeconds": 0.11933983333333333,
+      "cpuPercent": 38.09436917747575,
+      "rssMiBMedian": 117.34375,
+      "rssMiBPeak": 117.34375,
+      "footprintMiBMedian": 52.36033630371094,
+      "footprintMiBPeak": 52.36033630371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 0,
+        "evaluationCallbacks": 0,
+        "logEntries": 1000,
+        "powerAssertionQueries": 0,
+        "refreshRequests": 0
+      },
+      "mainThreadMilliseconds": 119.33812500501517,
+      "completedMilliseconds": 271.65608333598357,
+      "iterations": 1000
+    },
+    {
+      "scenario": "refreshBurst",
+      "trial": 3,
+      "wallSeconds": 0.3936868330000003,
+      "cpuSeconds": 0.1464140833333333,
+      "cpuPercent": 37.19049535327823,
+      "rssMiBMedian": 117.34375,
+      "rssMiBPeak": 117.359375,
+      "footprintMiBMedian": 52.36033630371094,
+      "footprintMiBPeak": 52.37596130371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 1000,
+        "evaluationCallbacks": 0,
+        "logEntries": 0,
+        "powerAssertionQueries": 1000,
+        "refreshRequests": 1000
+      },
+      "mainThreadMilliseconds": 194.48225000087405,
+      "completedMilliseconds": 353.2216250023339,
+      "iterations": 1000
+    },
+    {
+      "scenario": "logBurst",
+      "trial": 3,
+      "wallSeconds": 0.30527337499999874,
+      "cpuSeconds": 0.11682454166666666,
+      "cpuPercent": 38.268827625949086,
+      "rssMiBMedian": 117.25,
+      "rssMiBPeak": 117.25,
+      "footprintMiBMedian": 52.29783630371094,
+      "footprintMiBPeak": 52.29783630371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 0,
+        "evaluationCallbacks": 0,
+        "logEntries": 1000,
+        "powerAssertionQueries": 0,
+        "refreshRequests": 0
+      },
+      "mainThreadMilliseconds": 116.13458333158633,
+      "completedMilliseconds": 269.40900000045076,
+      "iterations": 1000
+    }
+  ]
+}

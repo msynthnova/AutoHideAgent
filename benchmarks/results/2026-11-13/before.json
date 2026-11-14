@@ -1,0 +1,430 @@
+{
+  "platform": "macOS-27.3-arm64-arm-64bit",
+  "architecture": "arm64",
+  "configuration": "optimized development bundle, dry-run",
+  "executableSHA256": "a7bb6cb2b725f84f8d2cd168af28ba6c2923cd5fe4eaa5cd21723ac3d2148d6b",
+  "durationSeconds": 20.0,
+  "repetitions": 3,
+  "cpuDefinition": "100% = one CPU core; Mach timebase converted delta user+system CPU divided by wall time",
+  "records": [
+    {
+      "scenario": "background",
+      "trial": 1,
+      "wallSeconds": 20.00558525,
+      "cpuSeconds": 0.06552408333333333,
+      "cpuPercent": 0.32752895011323563,
+      "rssMiBMedian": 117.28125,
+      "rssMiBPeak": 117.9375,
+      "footprintMiBMedian": 52.54785919189453,
+      "footprintMiBPeak": 52.95410919189453,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 1,
+        "evaluationCallbacks": 1,
+        "logEntries": 0,
+        "powerAssertionQueries": 2,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "off",
+      "trial": 1,
+      "wallSeconds": 20.0001795,
+      "cpuSeconds": 0.04348766666666666,
+      "cpuPercent": 0.21743638184180628,
+      "rssMiBMedian": 117.328125,
+      "rssMiBPeak": 117.5625,
+      "footprintMiBMedian": 51.59471130371094,
+      "footprintMiBPeak": 52.90723419189453,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 2,
+        "evaluationCallbacks": 1,
+        "logEntries": 0,
+        "powerAssertionQueries": 2,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "paused",
+      "trial": 1,
+      "wallSeconds": 20.004613958999997,
+      "cpuSeconds": 0.0031409999999999997,
+      "cpuPercent": 0.01570137772434682,
+      "rssMiBMedian": 117.75,
+      "rssMiBPeak": 118.0,
+      "footprintMiBMedian": 51.93848419189453,
+      "footprintMiBPeak": 52.11033630371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 0,
+        "evaluationCallbacks": 1,
+        "logEntries": 0,
+        "powerAssertionQueries": 0,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "dashboard",
+      "trial": 1,
+      "wallSeconds": 20.001127665999988,
+      "cpuSeconds": 0.04159508333333333,
+      "cpuPercent": 0.20796369098748874,
+      "rssMiBMedian": 118.0625,
+      "rssMiBPeak": 118.4375,
+      "footprintMiBMedian": 51.62596130371094,
+      "footprintMiBPeak": 51.92285919189453,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 1,
+        "evaluationCallbacks": 1,
+        "logEntries": 0,
+        "powerAssertionQueries": 2,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "menu",
+      "trial": 1,
+      "wallSeconds": 20.003672124999994,
+      "cpuSeconds": 0.038157375,
+      "cpuPercent": 0.1907518517678164,
+      "rssMiBMedian": 119.015625,
+      "rssMiBPeak": 119.28125,
+      "footprintMiBMedian": 52.61035919189453,
+      "footprintMiBPeak": 52.82908630371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 2,
+        "evaluationCallbacks": 2,
+        "logEntries": 0,
+        "powerAssertionQueries": 4,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "refreshBurst",
+      "trial": 1,
+      "wallSeconds": 0.36784791700000596,
+      "cpuSeconds": 0.142515125,
+      "cpuPercent": 38.742947401275536,
+      "rssMiBMedian": 119.28125,
+      "rssMiBPeak": 119.28125,
+      "footprintMiBMedian": 52.89158630371094,
+      "footprintMiBPeak": 52.89158630371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 1000,
+        "evaluationCallbacks": 0,
+        "logEntries": 0,
+        "powerAssertionQueries": 1000,
+        "refreshRequests": 1000
+      },
+      "mainThreadMilliseconds": 194.82016666734125,
+      "completedMilliseconds": 349.5882083370816,
+      "iterations": 1000
+    },
+    {
+      "scenario": "logBurst",
+      "trial": 1,
+      "wallSeconds": 0.27690687499999456,
+      "cpuSeconds": 0.11151666666666665,
+      "cpuPercent": 40.272263614498144,
+      "rssMiBMedian": 119.296875,
+      "rssMiBPeak": 119.296875,
+      "footprintMiBMedian": 52.90721130371094,
+      "footprintMiBPeak": 52.90721130371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 0,
+        "evaluationCallbacks": 0,
+        "logEntries": 1000,
+        "powerAssertionQueries": 0,
+        "refreshRequests": 0
+      },
+      "mainThreadMilliseconds": 111.44237499684095,
+      "completedMilliseconds": 268.8920833315933,
+      "iterations": 1000
+    },
+    {
+      "scenario": "background",
+      "trial": 2,
+      "wallSeconds": 20.002034915999985,
+      "cpuSeconds": 0.09097512499999999,
+      "cpuPercent": 0.45482934802412206,
+      "rssMiBMedian": 119.1875,
+      "rssMiBPeak": 119.296875,
+      "footprintMiBMedian": 52.82908630371094,
+      "footprintMiBPeak": 52.90721130371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 3,
+        "evaluationCallbacks": 1,
+        "logEntries": 0,
+        "powerAssertionQueries": 4,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "off",
+      "trial": 2,
+      "wallSeconds": 20.003556167,
+      "cpuSeconds": 0.08557216666666666,
+      "cpuPercent": 0.4277847696292904,
+      "rssMiBMedian": 119.1875,
+      "rssMiBPeak": 119.34375,
+      "footprintMiBMedian": 52.93846130371094,
+      "footprintMiBPeak": 53.09471130371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 2,
+        "evaluationCallbacks": 2,
+        "logEntries": 0,
+        "powerAssertionQueries": 2,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "paused",
+      "trial": 2,
+      "wallSeconds": 20.005056832999998,
+      "cpuSeconds": 1.1510277916666665,
+      "cpuPercent": 5.753684187329831,
+      "rssMiBMedian": 115.0,
+      "rssMiBPeak": 120.359375,
+      "footprintMiBMedian": 54.18067169189453,
+      "footprintMiBPeak": 55.45410919189453,
+      "idleWakeups": 2,
+      "metrics": {
+        "appScans": 2,
+        "evaluationCallbacks": 1,
+        "logEntries": 0,
+        "powerAssertionQueries": 2,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "dashboard",
+      "trial": 2,
+      "wallSeconds": 20.001233041999996,
+      "cpuSeconds": 0.48797870833333334,
+      "cpuPercent": 2.439743126379465,
+      "rssMiBMedian": 110.046875,
+      "rssMiBPeak": 110.875,
+      "footprintMiBMedian": 54.39158630371094,
+      "footprintMiBPeak": 54.70408630371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 3,
+        "evaluationCallbacks": 1,
+        "logEntries": 0,
+        "powerAssertionQueries": 4,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "menu",
+      "trial": 2,
+      "wallSeconds": 20.005114417000016,
+      "cpuSeconds": 0.041006875,
+      "cpuPercent": 0.2049819568397621,
+      "rssMiBMedian": 109.046875,
+      "rssMiBPeak": 109.875,
+      "footprintMiBMedian": 53.78223419189453,
+      "footprintMiBPeak": 54.11035919189453,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 1,
+        "evaluationCallbacks": 1,
+        "logEntries": 0,
+        "powerAssertionQueries": 2,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "refreshBurst",
+      "trial": 2,
+      "wallSeconds": 0.3751897500000041,
+      "cpuSeconds": 0.13777004166666665,
+      "cpuPercent": 36.72009740848868,
+      "rssMiBMedian": 109.0625,
+      "rssMiBPeak": 109.0625,
+      "footprintMiBMedian": 53.81346130371094,
+      "footprintMiBPeak": 53.81346130371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 1000,
+        "evaluationCallbacks": 0,
+        "logEntries": 0,
+        "powerAssertionQueries": 1000,
+        "refreshRequests": 1000
+      },
+      "mainThreadMilliseconds": 186.8464583385503,
+      "completedMilliseconds": 346.9735833350569,
+      "iterations": 1000
+    },
+    {
+      "scenario": "logBurst",
+      "trial": 2,
+      "wallSeconds": 0.29947758299999805,
+      "cpuSeconds": 0.11843237499999999,
+      "cpuPercent": 39.546323906320815,
+      "rssMiBMedian": 109.0625,
+      "rssMiBPeak": 109.0625,
+      "footprintMiBMedian": 53.81346130371094,
+      "footprintMiBPeak": 53.81346130371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 0,
+        "evaluationCallbacks": 0,
+        "logEntries": 1000,
+        "powerAssertionQueries": 0,
+        "refreshRequests": 0
+      },
+      "mainThreadMilliseconds": 117.6845833324478,
+      "completedMilliseconds": 274.31937499932246,
+      "iterations": 1000
+    },
+    {
+      "scenario": "background",
+      "trial": 3,
+      "wallSeconds": 20.005116291999997,
+      "cpuSeconds": 0.02500608333333333,
+      "cpuPercent": 0.12499844024067588,
+      "rssMiBMedian": 109.015625,
+      "rssMiBPeak": 109.0625,
+      "footprintMiBMedian": 53.76658630371094,
+      "footprintMiBPeak": 53.81346130371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 1,
+        "evaluationCallbacks": 1,
+        "logEntries": 0,
+        "powerAssertionQueries": 2,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "off",
+      "trial": 3,
+      "wallSeconds": 20.00447595899999,
+      "cpuSeconds": 0.002582208333333333,
+      "cpuPercent": 0.012908152848520886,
+      "rssMiBMedian": 108.984375,
+      "rssMiBPeak": 109.0625,
+      "footprintMiBMedian": 53.86033630371094,
+      "footprintMiBPeak": 53.93846130371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 0,
+        "evaluationCallbacks": 2,
+        "logEntries": 0,
+        "powerAssertionQueries": 0,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "paused",
+      "trial": 3,
+      "wallSeconds": 20.001296292000006,
+      "cpuSeconds": 0.04745945833333333,
+      "cpuPercent": 0.23728191233443136,
+      "rssMiBMedian": 109.0546875,
+      "rssMiBPeak": 109.09375,
+      "footprintMiBMedian": 54.03221130371094,
+      "footprintMiBPeak": 54.04783630371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 2,
+        "evaluationCallbacks": 1,
+        "logEntries": 0,
+        "powerAssertionQueries": 2,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "dashboard",
+      "trial": 3,
+      "wallSeconds": 20.005043041999954,
+      "cpuSeconds": 0.13998379166666666,
+      "cpuPercent": 0.6997425167882675,
+      "rssMiBMedian": 109.453125,
+      "rssMiBPeak": 110.0625,
+      "footprintMiBMedian": 54.09471130371094,
+      "footprintMiBPeak": 54.61033630371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 4,
+        "evaluationCallbacks": 2,
+        "logEntries": 0,
+        "powerAssertionQueries": 6,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "menu",
+      "trial": 3,
+      "wallSeconds": 20.00105633299995,
+      "cpuSeconds": 0.038412666666666664,
+      "cpuPercent": 0.1920531897272306,
+      "rssMiBMedian": 109.390625,
+      "rssMiBPeak": 109.515625,
+      "footprintMiBMedian": 53.82908630371094,
+      "footprintMiBPeak": 53.93848419189453,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 1,
+        "evaluationCallbacks": 1,
+        "logEntries": 0,
+        "powerAssertionQueries": 2,
+        "refreshRequests": 0
+      }
+    },
+    {
+      "scenario": "refreshBurst",
+      "trial": 3,
+      "wallSeconds": 0.37940445800001044,
+      "cpuSeconds": 0.141249625,
+      "cpuPercent": 37.22930029462018,
+      "rssMiBMedian": 109.40625,
+      "rssMiBPeak": 109.40625,
+      "footprintMiBMedian": 53.86033630371094,
+      "footprintMiBPeak": 53.86033630371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 1000,
+        "evaluationCallbacks": 0,
+        "logEntries": 0,
+        "powerAssertionQueries": 1000,
+        "refreshRequests": 1000
+      },
+      "mainThreadMilliseconds": 193.47858333640033,
+      "completedMilliseconds": 351.5071666697622,
+      "iterations": 1000
+    },
+    {
+      "scenario": "logBurst",
+      "trial": 3,
+      "wallSeconds": 0.31211787500001265,
+      "cpuSeconds": 0.11847804166666666,
+      "cpuPercent": 37.95939007551614,
+      "rssMiBMedian": 109.40625,
+      "rssMiBPeak": 109.40625,
+      "footprintMiBMedian": 53.86033630371094,
+      "footprintMiBPeak": 53.86033630371094,
+      "idleWakeups": 0,
+      "metrics": {
+        "appScans": 0,
+        "evaluationCallbacks": 0,
+        "logEntries": 1000,
+        "powerAssertionQueries": 0,
+        "refreshRequests": 0
+      },
+      "mainThreadMilliseconds": 117.49237500043819,
+      "completedMilliseconds": 277.66150000388734,
+      "iterations": 1000
+    }
+  ],
+  "cpuTickSeconds": 4.166666666666666e-08,
+  "collectorNote": "Original baseline raw CPU ticks converted using measured Mach timebase; wall times and memory unchanged."
+}

@@ -50,7 +50,7 @@ public struct MainDashboardView: View {
         }
     }
 
-    private let uiRefreshTimer = Timer.publish(every: 10.0, tolerance: 2.0, on: .main, in: .common).autoconnect()
+    @State private var isDashboardVisible = false
 
     @State private var isPrivacyInfoExpanded: Bool = false
     @State private var showPermissionGrantedBadge: Bool = false
@@ -248,15 +248,16 @@ public struct MainDashboardView: View {
         .toolbar(removing: .sidebarToggle)
         .frame(minWidth: 840, idealWidth: 960, minHeight: 560, idealHeight: 620)
         .onAppear {
+            updateDashboardVisibility()
             manager.refreshRunningApps()
             manager.refreshLaunchAtLoginStatus()
             manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
-            if let window = NSApplication.shared.windows.first(where: { $0.title == "AutoHideAgent" }) {
+            if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == AppRuntime.dashboardWindowIdentifier }) {
                 isMaximized = window.isZoomed
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResizeNotification)) { _ in
-            if let window = NSApplication.shared.windows.first(where: { $0.title == "AutoHideAgent" }) {
+            if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == AppRuntime.dashboardWindowIdentifier }) {
                 isMaximized = window.isZoomed
             }
         }
@@ -277,18 +278,26 @@ public struct MainDashboardView: View {
                 }
             }
         }
-        .onReceive(uiRefreshTimer) { _ in
-            guard let window = NSApplication.shared.windows.first(where: { $0.title == "AutoHideAgent" }),
-                  window.isVisible,
-                  window.occlusionState.contains(.visible) else {
-                return
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeOcclusionStateNotification)) { notification in
+            guard let window = notification.object as? NSWindow,
+                  window.identifier?.rawValue == AppRuntime.dashboardWindowIdentifier else { return }
+            updateDashboardVisibility()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { notification in
+            if let window = notification.object as? NSWindow,
+               window.identifier?.rawValue == AppRuntime.dashboardWindowIdentifier {
+                isDashboardVisible = false
             }
-            if !manager.isAccessibilityTrusted {
-                manager.refreshAccessibilityTrustStatus(promptIfNeeded: false)
-            }
-            if selectedSection == .runningApps {
-                manager.refreshRunningApps()
-            }
+        }
+        .task(id: isDashboardVisible && selectedSection == .runningApps) {
+            guard isDashboardVisible, selectedSection == .runningApps else { return }
+            do {
+                while !Task.isCancelled {
+                    try await Task.sleep(for: .seconds(10))
+                    try Task.checkCancellation()
+                    manager.requestRunningAppsRefresh()
+                }
+            } catch { /* Hiding the window or changing tabs cancels refresh work. */ }
         }
         .onReceive(
             DistributedNotificationCenter.default().publisher(
@@ -310,8 +319,15 @@ public struct MainDashboardView: View {
         }
     }
 
+    private func updateDashboardVisibility() {
+        let window = NSApplication.shared.windows.first {
+            $0.identifier?.rawValue == AppRuntime.dashboardWindowIdentifier
+        }
+        isDashboardVisible = window?.isVisible == true && window?.occlusionState.contains(.visible) == true
+    }
+
     private func toggleMaximize() {
-        if let window = NSApplication.shared.keyWindow ?? NSApplication.shared.windows.first(where: { $0.title == "AutoHideAgent" }) {
+        if let window = NSApplication.shared.keyWindow ?? NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == AppRuntime.dashboardWindowIdentifier }) {
             window.performZoom(nil)
             isMaximized = window.isZoomed
         }
@@ -518,8 +534,6 @@ public struct MainDashboardView: View {
                                         HStack {
                                             Text("Pause for \(preset.descriptiveLabel)")
                                             if manager.pauseDurationSeconds == preset.rawValue {
-                                                Image(systemName: "checkmark")
-                                            } else if !manager.isTemporarilyPaused && manager.pauseDurationSeconds == preset.rawValue {
                                                 Image(systemName: "checkmark")
                                             }
                                         }
@@ -785,6 +799,7 @@ public struct MainDashboardView: View {
                                 .toggleStyle(.switch)
                                 .pointerStyle(.link)
                                 .labelsHidden()
+                                .disabled(!updateController.isUpdaterAvailable)
                         }
                         .padding(.horizontal, 14)
                         .padding(.vertical, 11)
@@ -883,8 +898,8 @@ public struct MainDashboardView: View {
     }
 
     private var currentAppVersionDisplay: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.4.7"
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "14"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.4.8"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "15"
         return "v\(version) (Build \(build))"
     }
 

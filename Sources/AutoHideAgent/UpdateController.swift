@@ -10,11 +10,18 @@ public final class UpdateController: NSObject, ObservableObject, SPUUpdaterDeleg
     @Published public var canCheckForUpdates: Bool = false
     @Published public var automaticallyChecksForUpdates: Bool = true {
         didSet {
-            guard updaterController != nil else { return }
+            guard let updaterController else {
+                if automaticallyChecksForUpdates {
+                    automaticallyChecksForUpdates = false
+                }
+                return
+            }
             updaterController.updater.automaticallyChecksForUpdates = automaticallyChecksForUpdates
         }
     }
     @Published public var lastUpdateCheckDate: Date? = nil
+
+    public var isUpdaterAvailable: Bool { updaterController != nil }
 
     private var cancellables = Set<AnyCancellable>()
 

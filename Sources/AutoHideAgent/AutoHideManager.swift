@@ -2,141 +2,12 @@ import AppKit
 import ApplicationServices
 import CoreGraphics
 import Foundation
-import IOKit.pwr_mgt
 import Observation
 import os.log
 import ServiceManagement
 import UserNotifications
 
 private let logger = Logger(subsystem: "com.systems.autohideagent", category: "AutoHideManager")
-
-// MARK: - Timeout Preset Models
-
-public enum TimeoutPreset: Int, CaseIterable, Identifiable, Sendable {
-    case fiveMinutes = 300
-    case tenMinutes = 600
-    case fifteenMinutes = 900
-    case thirtyMinutes = 1800
-    case oneHour = 3600
-
-    public var id: Int { rawValue }
-
-    public var label: String {
-        switch self {
-        case .fiveMinutes: return "5m"
-        case .tenMinutes: return "10m"
-        case .fifteenMinutes: return "15m"
-        case .thirtyMinutes: return "30m"
-        case .oneHour: return "1h"
-        }
-    }
-
-    public var timeInterval: TimeInterval {
-        TimeInterval(rawValue)
-    }
-}
-
-public enum QuitTimeoutPreset: Int, CaseIterable, Identifiable, Sendable {
-    case oneHour = 3600
-    case twoHours = 7200
-    case sixHours = 21600
-    case twelveHours = 43200
-    case oneDay = 86400
-
-    public var id: Int { rawValue }
-
-    public var label: String {
-        switch self {
-        case .oneHour: return "1h"
-        case .twoHours: return "2h"
-        case .sixHours: return "6h"
-        case .twelveHours: return "12h"
-        case .oneDay: return "1d"
-        }
-    }
-
-    public var timeInterval: TimeInterval {
-        TimeInterval(rawValue)
-    }
-}
-
-public enum PausePreset: Int, CaseIterable, Identifiable, Sendable {
-    case thirtyMinutes = 1800
-    case oneHour = 3600
-    case twoHours = 7200
-    case fourHours = 14400
-    case eightHours = 28800
-    case twelveHours = 43200
-
-    public var id: Int { rawValue }
-
-    public var label: String {
-        switch self {
-        case .thirtyMinutes: return "30m"
-        case .oneHour: return "1h"
-        case .twoHours: return "2h"
-        case .fourHours: return "4h"
-        case .eightHours: return "8h"
-        case .twelveHours: return "12h"
-        }
-    }
-
-    public var shortLabel: String {
-        label
-    }
-
-    public var descriptiveLabel: String {
-        switch self {
-        case .thirtyMinutes: return "30 Minutes"
-        case .oneHour: return "1 Hour"
-        case .twoHours: return "2 Hours"
-        case .fourHours: return "4 Hours"
-        case .eightHours: return "8 Hours"
-        case .twelveHours: return "12 Hours"
-        }
-    }
-
-    public var fullName: String {
-        descriptiveLabel
-    }
-
-    public var timeInterval: TimeInterval {
-        TimeInterval(rawValue)
-    }
-}
-
-// MARK: - Activity Log Entry
-
-public struct ActivityLogEntry: Identifiable, Sendable {
-    public enum Level: String, Sendable {
-        case info = "INFO"
-        case warning = "NOTICE"
-        case action = "ACTION"
-    }
-
-    public let id = UUID()
-    public let timestamp: Date
-    public let level: Level
-    public let userFriendlyMessage: String
-    public let technicalDetail: String
-}
-
-// MARK: - Running App Representation
-
-public struct RunningAppInfo: Identifiable, Hashable, Sendable {
-    public let pid: pid_t
-    public let bundleIdentifier: String
-    public let localizedName: String
-    public let icon: NSImage?
-    public let isHidden: Bool
-    public let isProtectedMostRecent: Bool
-    public let hasActivePowerAssertion: Bool
-    public let isWhitelisted: Bool
-    public let deactivatedSince: Date?
-    public let elapsedInactiveSeconds: TimeInterval?
-
-    public var id: String { "\(bundleIdentifier)-\(pid)" }
-}
 
 /// Debug automation hooks (snapshots, tab switching) are only active when launched with AUTOHIDE_DEBUG=1.
 public let autoHideDebugHooksEnabled = ProcessInfo.processInfo.environment["AUTOHIDE_DEBUG"] != nil
@@ -152,22 +23,7 @@ public final class AutoHideManager {
 
     // MARK: - UserDefaults Keys
 
-    private enum Keys {
-        static let isEnabled = "com.systems.autohideagent.isEnabled"
-        static let isAutoHideEnabled = "com.systems.autohideagent.isAutoHideEnabled"
-        static let timeoutSeconds = "com.systems.autohideagent.timeoutSeconds"
-        static let isAutoQuitEnabled = "com.systems.autohideagent.isAutoQuitEnabled"
-        static let quitTimeoutSeconds = "com.systems.autohideagent.quitTimeoutSeconds"
-        static let confirmBeforeAutoQuit = "com.systems.autohideagent.confirmBeforeAutoQuit"
-        static let alertOnAppHide = "com.systems.autohideagent.alertOnAppHide"
-        static let alertOnAppQuit = "com.systems.autohideagent.alertOnAppQuit"
-        static let pauseDurationSeconds = "com.systems.autohideagent.pauseDurationSeconds"
-        static let keepPreviousAppVisible = "com.systems.autohideagent.keepPreviousAppVisible"
-        static let protectActiveMediaApps = "com.systems.autohideagent.protectActiveMediaApps"
-        static let showInDock = "com.systems.autohideagent.showInDock"
-        static let showInMenuBar = "com.systems.autohideagent.showInMenuBar"
-        static let whitelistedItems = "com.systems.autohideagent.whitelistedItems"
-    }
+    private typealias Keys = AppPreferences.Keys
 
     // MARK: - Persistent Properties
 
@@ -193,6 +49,7 @@ public final class AutoHideManager {
         didSet {
             guard isAutoHideEnabled != oldValue else { return }
             defaults.set(isAutoHideEnabled, forKey: Keys.isAutoHideEnabled)
+            startEvaluationTimer()
             appendLog(
                 .info,
                 isAutoHideEnabled ? "Enabled Auto-Hide (\(formatFriendlyDuration(TimeInterval(timeoutSeconds))))." : "Disabled Auto-Hide.",
@@ -224,6 +81,7 @@ public final class AutoHideManager {
         didSet {
             guard isAutoQuitEnabled != oldValue else { return }
             defaults.set(isAutoQuitEnabled, forKey: Keys.isAutoQuitEnabled)
+            startEvaluationTimer()
             appendLog(
                 .info,
                 isAutoQuitEnabled ? "Enabled Auto-Quit (\(formatFriendlyDuration(TimeInterval(quitTimeoutSeconds))))." : "Disabled Auto-Quit.",
@@ -337,6 +195,7 @@ public final class AutoHideManager {
         didSet {
             guard protectActiveMediaApps != oldValue else { return }
             defaults.set(protectActiveMediaApps, forKey: Keys.protectActiveMediaApps)
+            appMonitor.invalidateAssertions()
             appendLog(
                 .info,
                 protectActiveMediaApps ? "Protecting apps playing audio/video or on calls." : "Turned off media & call protection.",
@@ -385,6 +244,8 @@ public final class AutoHideManager {
     /// Stores whitelisted bundle identifiers (e.g., `com.apple.Safari`) or localized app names.
     public var whitelistedBundleIDs: [String] {
         didSet {
+            guard whitelistedBundleIDs != oldValue else { return }
+            exclusionIndex.replace(with: whitelistedBundleIDs)
             defaults.set(whitelistedBundleIDs, forKey: Keys.whitelistedItems)
         }
     }
@@ -440,67 +301,48 @@ public final class AutoHideManager {
 
     // MARK: - Private Machinery
 
+    @ObservationIgnored var runtimeMetrics = RuntimeMetrics()
+
     private let defaults: UserDefaults
     private let monitoringEnabled: Bool
     private let dryRunOverride: Bool
-    private var evaluationTimer: Timer?
+    private let evaluationScheduler = EvaluationScheduler()
+    private let refreshCoordinator = RefreshCoordinator()
+    private let appMonitor = AppMonitor()
+    private let logWriter: DiagnosticLogWriter
+    @ObservationIgnored private var exclusionIndex = ExclusionIndex([])
     private var accessibilityPollTimer: Timer?
+    private var applicationObservers: [NSObjectProtocol] = []
     private var workspaceObservers: [NSObjectProtocol] = []
     private var distributedObservers: [NSObjectProtocol] = []
 
-    /// Periodic timer interval (15 seconds) with 5-second tolerance for macOS timer coalescing.
-    private let timerInterval: TimeInterval = 15.0
-    private let timerTolerance: TimeInterval = 5.0
-
-    /// In-memory application icon cache to eliminate disk lookups and image decoding during periodic ticks.
-    private var iconCache: [String: NSImage] = [:]
 
     // MARK: - Initialization
 
-    public init(defaults: UserDefaults = .standard, monitoringEnabled: Bool = true, dryRun: Bool = false) {
+    public init(defaults: UserDefaults = .standard, monitoringEnabled: Bool = true, dryRun: Bool = false, logDirectory: URL? = nil) {
         self.defaults = defaults
         self.monitoringEnabled = monitoringEnabled
         self.dryRunOverride = dryRun
-        defaults.register(defaults: [
-            Keys.isEnabled: true,
-            Keys.isAutoHideEnabled: true,
-            Keys.timeoutSeconds: TimeoutPreset.fifteenMinutes.rawValue,
-            Keys.isAutoQuitEnabled: false,
-            Keys.quitTimeoutSeconds: QuitTimeoutPreset.twoHours.rawValue,
-            Keys.confirmBeforeAutoQuit: true,
-            Keys.alertOnAppHide: false,
-            Keys.alertOnAppQuit: true,
-            Keys.pauseDurationSeconds: PausePreset.oneHour.rawValue,
-            Keys.keepPreviousAppVisible: false,
-            Keys.protectActiveMediaApps: true,
-            Keys.showInDock: true,
-            Keys.showInMenuBar: false,
-            Keys.whitelistedItems: [
-                "com.apple.finder"
-            ]
-        ])
-
-        self.isEnabled = defaults.bool(forKey: Keys.isEnabled)
-        self.isAutoHideEnabled = defaults.bool(forKey: Keys.isAutoHideEnabled)
-        let savedTimeout = defaults.integer(forKey: Keys.timeoutSeconds)
-        self.timeoutSeconds = TimeoutPreset(rawValue: savedTimeout)?.rawValue ?? TimeoutPreset.fifteenMinutes.rawValue
-        self.isAutoQuitEnabled = defaults.bool(forKey: Keys.isAutoQuitEnabled)
-        let savedQuitTimeout = defaults.integer(forKey: Keys.quitTimeoutSeconds)
-        self.quitTimeoutSeconds = QuitTimeoutPreset(rawValue: savedQuitTimeout)?.rawValue ?? QuitTimeoutPreset.twoHours.rawValue
-        self.confirmBeforeAutoQuit = defaults.bool(forKey: Keys.confirmBeforeAutoQuit)
-        self.alertOnAppHide = defaults.bool(forKey: Keys.alertOnAppHide)
-        if defaults.object(forKey: Keys.alertOnAppQuit) != nil {
-            self.alertOnAppQuit = defaults.bool(forKey: Keys.alertOnAppQuit)
-        } else {
-            self.alertOnAppQuit = true
-        }
-        let savedPauseSeconds = defaults.integer(forKey: Keys.pauseDurationSeconds)
-        self.pauseDurationSeconds = PausePreset(rawValue: savedPauseSeconds)?.rawValue ?? PausePreset.oneHour.rawValue
-        self.keepPreviousAppVisible = defaults.bool(forKey: Keys.keepPreviousAppVisible)
-        self.protectActiveMediaApps = defaults.bool(forKey: Keys.protectActiveMediaApps)
-        self.showInDock = defaults.bool(forKey: Keys.showInDock)
-        self.showInMenuBar = defaults.bool(forKey: Keys.showInMenuBar)
-        self.whitelistedBundleIDs = defaults.stringArray(forKey: Keys.whitelistedItems) ?? ["com.apple.finder"]
+        let benchmarkDirectory = AppRuntime.isDevelopment && (dryRun || CommandLine.arguments.contains("--dry-run"))
+            ? ProcessInfo.processInfo.environment["AUTOHIDE_BENCHMARK_DIRECTORY"] : nil
+        logWriter = DiagnosticLogWriter(url: logDirectory?.appendingPathComponent("AutoHideAgent.log")
+            ?? DiagnosticLogWriter.defaultURL(isDevelopment: AppRuntime.isDevelopment, benchmarkDirectory: benchmarkDirectory))
+        let settings = AppPreferences(defaults: defaults)
+        self.isEnabled = settings.isEnabled
+        self.isAutoHideEnabled = settings.isAutoHideEnabled
+        self.timeoutSeconds = settings.timeoutSeconds
+        self.isAutoQuitEnabled = settings.isAutoQuitEnabled
+        self.quitTimeoutSeconds = settings.quitTimeoutSeconds
+        self.confirmBeforeAutoQuit = settings.confirmBeforeAutoQuit
+        self.alertOnAppHide = settings.alertOnAppHide
+        self.alertOnAppQuit = settings.alertOnAppQuit
+        self.pauseDurationSeconds = settings.pauseDurationSeconds
+        self.keepPreviousAppVisible = settings.keepPreviousAppVisible
+        self.protectActiveMediaApps = settings.protectActiveMediaApps
+        self.showInDock = settings.showInDock
+        self.showInMenuBar = settings.showInMenuBar
+        self.whitelistedBundleIDs = settings.whitelistedBundleIDs
+        exclusionIndex = ExclusionIndex(settings.whitelistedBundleIDs)
 
         seedInitialBackgroundTimestamps()
         if monitoringEnabled {
@@ -541,6 +383,7 @@ public final class AutoHideManager {
         }
         let until = Date.now.addingTimeInterval(seconds)
         pausedUntilDate = until
+        startEvaluationTimer()
         let friendly = formatFriendlyDuration(seconds)
         appendLog(
             .info,
@@ -567,6 +410,7 @@ public final class AutoHideManager {
     public func resumeFromTemporaryPause() {
         guard pausedUntilDate != nil else { return }
         pausedUntilDate = nil
+        startEvaluationTimer()
         // Reset background timestamps to now so apps aren't immediately hidden on unpause
         seedInitialBackgroundTimestamps()
         appendLog(.info, "Resumed AutoHideAgent from temporary pause.", technical: "manual/auto resume")
@@ -820,14 +664,7 @@ public final class AutoHideManager {
     // MARK: - In-App & Persistent File Logger
 
     /// Path to the persistent diagnostic log file (`~/Library/Logs/AutoHideAgent/AutoHideAgent.log` or `AutoHideAgent-Dev`).
-    public var logFileURL: URL {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let folderName = isDevBuild ? "AutoHideAgent-Dev" : "AutoHideAgent"
-        let fileName = isDevBuild ? "AutoHideAgent-Dev.log" : "AutoHideAgent.log"
-        let logsDir = home.appendingPathComponent("Library/Logs/\(folderName)", isDirectory: true)
-        try? FileManager.default.createDirectory(at: logsDir, withIntermediateDirectories: true)
-        return logsDir.appendingPathComponent(fileName, isDirectory: false)
-    }
+    public var logFileURL: URL { logWriter.url }
 
     private static let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
@@ -883,33 +720,13 @@ public final class AutoHideManager {
     }
 
     private func writeToPersistentLogFile(_ line: String) {
-        let url = logFileURL
-        guard let data = line.data(using: .utf8) else { return }
-        // Rotate at 1 MB so the diagnostic log never grows without bound
-        if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int, size > 1_000_000 {
-            let old = url.deletingPathExtension().appendingPathExtension("old.log")
-            try? FileManager.default.removeItem(at: old)
-            try? FileManager.default.moveItem(at: url, to: old)
-        }
-        if FileManager.default.fileExists(atPath: url.path) {
-            if let handle = try? FileHandle(forWritingTo: url) {
-                defer { try? handle.close() }
-                _ = try? handle.seekToEnd()
-                try? handle.write(contentsOf: data)
-            }
-        } else {
-            let header = """
-            ================================================================================
-            AutoHideAgent Diagnostic Log
-            macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)
-            Bundle ID: \(Bundle.main.bundleIdentifier ?? "com.systems.autohideagent")
-            ================================================================================
-            
-            """
-            let combined = (header.data(using: .utf8) ?? Data()) + data
-            try? combined.write(to: url, options: .atomic)
-        }
+        runtimeMetrics.logEntries += 1
+        logWriter.append(line)
     }
+
+    public func flushDiagnosticLog() async { try? await logWriter.flush() }
+
+    public func finishDiagnosticLog() { logWriter.finish() }
 
     public func openDiagnosticLogFile() {
         let url = logFileURL
@@ -918,7 +735,10 @@ public final class AutoHideManager {
         }
         let snapshot = "[\(Self.isoFormatter.string(from: Date.now))] [SNAPSHOT] Enabled=\(isEnabled), PausedUntil=\(String(describing: pausedUntilDate)), HideTimeout=\(timeoutSeconds)s, AutoQuit=\(isAutoQuitEnabled) (\(quitTimeoutSeconds)s), ConfirmQuit=\(confirmBeforeAutoQuit), KeepPrev=\(keepPreviousAppVisible), ProtectMedia=\(protectActiveMediaApps), AXTrusted=\(isAccessibilityTrusted), HIDIdle=\(String(format: "%.1f", currentHIDIdleSeconds()))s, ActivePauseReasons=\(activePauseReasons), TrackedApps=\(lastDeactivatedDates.count), Whitelist=\(whitelistedBundleIDs)\n"
         writeToPersistentLogFile(snapshot)
-        NSWorkspace.shared.open(url)
+        Task { @MainActor [logWriter] in
+            try? await logWriter.flush()
+            NSWorkspace.shared.open(url)
+        }
     }
 
     public func revealDiagnosticLogInFinder() {
@@ -926,7 +746,10 @@ public final class AutoHideManager {
         if !FileManager.default.fileExists(atPath: url.path) {
             appendLog(.info, "Created diagnostic log file.", technical: "path=\(url.path)")
         }
-        NSWorkspace.shared.activateFileViewerSelecting([url])
+        Task { @MainActor [logWriter] in
+            try? await logWriter.flush()
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
     }
 
     public func clearLogs() {
@@ -1038,7 +861,7 @@ public final class AutoHideManager {
                 if !self.isAccessibilityTrusted {
                     self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
                 }
-                self.refreshRunningApps()
+                self.requestRunningAppsRefresh()
             }
         }
 
@@ -1066,7 +889,7 @@ public final class AutoHideManager {
                 if !self.isAccessibilityTrusted {
                     self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
                 }
-                self.refreshRunningApps()
+                self.requestRunningAppsRefresh()
             }
         }
 
@@ -1097,12 +920,12 @@ public final class AutoHideManager {
                     }
                 }
                 if let bundleID {
-                    self.iconCache.removeValue(forKey: bundleID)
+                    self.appMonitor.removeIcon(bundleID: bundleID)
                 }
                 if !self.isAccessibilityTrusted {
                     self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
                 }
-                self.refreshRunningApps()
+                self.requestRunningAppsRefresh()
             }
         }
 
@@ -1125,7 +948,7 @@ public final class AutoHideManager {
                 if !self.isAccessibilityTrusted {
                     self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
                 }
-                self.refreshRunningApps()
+                self.requestRunningAppsRefresh()
             }
         }
 
@@ -1136,7 +959,7 @@ public final class AutoHideManager {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.refreshRunningApps()
+                self?.requestRunningAppsRefresh()
             }
         }
 
@@ -1161,7 +984,7 @@ public final class AutoHideManager {
                     )
                 }
                 self.refreshAccessibilityTrustStatus(promptIfNeeded: false)
-                self.refreshRunningApps()
+                self.requestRunningAppsRefresh()
             }
         }
 
@@ -1207,8 +1030,8 @@ public final class AutoHideManager {
             }
         }
 
+        applicationObservers = [appActiveObserver]
         workspaceObservers = [
-            appActiveObserver,
             activateObserver,
             deactivateObserver,
             terminateObserver,
@@ -1283,34 +1106,10 @@ public final class AutoHideManager {
 
     /// Queries `IOPMCopyAssertionsByProcess` to identify PIDs currently holding active audio, video,
     /// conference call, or background task power assertions (e.g. Spotify, Apple Music, Zoom, VLC).
-    public nonisolated func activePowerAssertionPIDs() -> Set<pid_t> {
-        var assertionsByPID: Unmanaged<CFDictionary>?
-        let status = IOPMCopyAssertionsByProcess(&assertionsByPID)
-        guard status == kIOReturnSuccess,
-              let dict = assertionsByPID?.takeRetainedValue() as? [NSNumber: [[String: Any]]] else {
-            return []
-        }
-
-        let protectedAssertionTypes: Set<String> = [
-            "PreventUserIdleDisplaySleep",
-            "PreventUserIdleSystemSleep",
-            "NoDisplaySleepAssertion",
-            "NoIdleSleepAssertion",
-            "audio-out",
-            "audio-in"
-        ]
-
-        var pids = Set<pid_t>()
-        for (pidNumber, assertions) in dict {
-            for assertion in assertions {
-                if let type = assertion["AssertType"] as? String,
-                   protectedAssertionTypes.contains(type) {
-                    pids.insert(pid_t(pidNumber.int32Value))
-                    break
-                }
-            }
-        }
-        return pids
+    public func activePowerAssertionPIDs() -> Set<pid_t> {
+        let result = appMonitor.protectedPIDs(forceFresh: true)
+        runtimeMetrics.powerAssertionQueries = appMonitor.assertionQueryCount
+        return result
     }
 
     // MARK: - Power-Efficient Periodic Evaluation
@@ -1325,23 +1124,14 @@ public final class AutoHideManager {
     }
 
     private func startEvaluationTimer() {
-        stopEvaluationTimer()
-        guard monitoringEnabled, activePauseReasons.isEmpty else { return }
-
-        let timer = Timer(timeInterval: timerInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.evaluateAndHideInactiveApps()
-            }
-        }
-        timer.tolerance = timerTolerance
-        RunLoop.main.add(timer, forMode: .common)
-        self.evaluationTimer = timer
+        guard monitoringEnabled else { evaluationScheduler.stop(); return }
+        let mode = EvaluationScheduler.desiredMode(enabled: isEnabled,
+            hasFeatures: isAutoHideEnabled || isAutoQuitEnabled, pauseUntil: pausedUntilDate,
+            sessionPaused: !activePauseReasons.isEmpty)
+        evaluationScheduler.configure(mode) { [weak self] in self?.evaluateAndHideInactiveApps() }
     }
 
-    private func stopEvaluationTimer() {
-        evaluationTimer?.invalidate()
-        evaluationTimer = nil
-    }
+    private func stopEvaluationTimer() { evaluationScheduler.stop() }
 
     // MARK: - Global HID Idle Guard & Execution
 
@@ -1356,11 +1146,10 @@ public final class AutoHideManager {
     /// that have exceeded their configured inactivity thresholds while the user is actively
     /// interacting with the system.
     public func evaluateAndHideInactiveApps() {
-        guard isEnabled, isAccessibilityTrusted || isDryRunMode else { return }
-        guard isAutoHideEnabled || isAutoQuitEnabled else { return }
-        guard pendingQuitConfirmationPIDs.isEmpty else { return }
+        runtimeMetrics.evaluationCallbacks += 1
+        guard isEnabled else { return }
 
-        // Check if "Pause for 1 Hour" snooze has expired or is still active
+        // Expire snoozes even when permission is unavailable or automation is off.
         if let until = pausedUntilDate {
             if Date.now >= until {
                 resumeFromTemporaryPause()
@@ -1368,6 +1157,10 @@ public final class AutoHideManager {
                 return
             }
         }
+
+        guard isAccessibilityTrusted || isDryRunMode else { return }
+        guard isAutoHideEnabled || isAutoQuitEnabled else { return }
+        guard pendingQuitConfirmationPIDs.isEmpty else { return }
 
         // Do not evaluate while the system, display, screensaver, or lock screen is active
         guard sleepBeganDate == nil && activePauseReasons.isEmpty else {
@@ -1399,11 +1192,13 @@ public final class AutoHideManager {
 
         let now = Date.now
         let currentUptime = ProcessInfo.processInfo.systemUptime
-        let frontmostApp = NSWorkspace.shared.frontmostApplication
+        let snapshot = appMonitor.capture(protectMedia: protectActiveMediaApps, forceFresh: true)
+        runtimeMetrics.powerAssertionQueries = appMonitor.assertionQueryCount
         let myPID = ProcessInfo.processInfo.processIdentifier
-        let protectedAssertions = protectActiveMediaApps ? activePowerAssertionPIDs() : []
+        let settings = InactivityPolicy.Settings(hideEnabled: isAutoHideEnabled, quitEnabled: isAutoQuitEnabled,
+            hideThreshold: hideThreshold, quitThreshold: quitThreshold, keepPreviousVisible: keepPreviousAppVisible)
 
-        for app in NSWorkspace.shared.runningApplications {
+        for app in snapshot.applications {
             let pid = app.processIdentifier
 
             // 1. Must be a standard user-facing application (.regular)
@@ -1413,7 +1208,7 @@ public final class AutoHideManager {
             guard app.isTerminated == false else { continue }
 
             // 3. Must not be the frontmost application (or ourselves)
-            guard app != frontmostApp, pid != myPID else {
+            guard pid != snapshot.frontmostPID, pid != myPID else {
                 lastDeactivatedDates.removeValue(forKey: pid)
                 lastDeactivatedUptimes.removeValue(forKey: pid)
                 autoQuitAttemptedPIDs.remove(pid)
@@ -1425,11 +1220,6 @@ public final class AutoHideManager {
 
             // 5. Must not match the user's whitelist (by bundleIdentifier or localizedName)
             guard !isAppWhitelisted(app) else { continue }
-
-            // 6. Smart Media / Call / Power Assertion Protection
-            if protectActiveMediaApps && protectedAssertions.contains(pid) {
-                continue
-            }
 
             // 7. Must have a recorded deactivation timestamp
             guard let lastDeactivatedDate = lastDeactivatedDates[pid] else {
@@ -1443,16 +1233,20 @@ public final class AutoHideManager {
             let inactiveDuration = max(0, min(wallAdjustedElapsed, uptimeElapsed))
             let appName = app.localizedName ?? app.bundleIdentifier ?? "PID \(pid)"
 
-            // 8A. Auto-Quit Evaluation (works even if the app was previously auto-hidden)
-            if isAutoQuitEnabled,
-               idleSeconds < quitThreshold,
-               inactiveDuration >= quitThreshold,
-               !autoQuitAttemptedPIDs.contains(pid),
-               !pendingQuitConfirmationPIDs.contains(pid) {
+            let decision = InactivityPolicy.decide(settings: settings, app: .init(
+                inactiveSeconds: inactiveDuration, idleSeconds: idleSeconds, isHidden: app.isHidden,
+                isPreviousApp: pid == mostRecentBackgroundPID,
+                isMediaProtected: snapshot.protectedPIDs.contains(pid),
+                quitAlreadyAttempted: autoQuitAttemptedPIDs.contains(pid),
+                quitConfirmationPending: pendingQuitConfirmationPIDs.contains(pid)))
 
+            if decision == .quit {
                 let friendlyTime = formatFriendlyDuration(inactiveDuration)
                 if confirmBeforeAutoQuit && !isDryRunMode {
                     promptAndConfirmAutoQuit(for: app, appName: appName, friendlyTime: friendlyTime, inactiveDuration: inactiveDuration)
+                    // Modal UI can change settings, focus, exclusions, or pause state.
+                    // Finish this pass rather than reusing its pre-dialog snapshot.
+                    return
                 } else {
                     autoQuitAttemptedPIDs.insert(pid)
                     performGracefulQuit(for: app, appName: appName, friendlyTime: friendlyTime, inactiveDuration: inactiveDuration)
@@ -1460,15 +1254,7 @@ public final class AutoHideManager {
                 continue
             }
 
-            // 8B. "Keep Previous App Visible" check before hiding
-            if keepPreviousAppVisible && pid == mostRecentBackgroundPID {
-                continue
-            }
-
-            // 8C. Auto-Hide Evaluation (only if Auto-Hide is enabled and app is not already hidden)
-            guard isAutoHideEnabled else { continue }
-            guard app.isHidden == false else { continue }
-            guard idleSeconds < hideThreshold, inactiveDuration >= hideThreshold else { continue }
+            guard decision == .hide else { continue }
 
             let friendlyTime = formatFriendlyDuration(inactiveDuration)
 
@@ -1525,7 +1311,7 @@ public final class AutoHideManager {
             }
         }
 
-        refreshRunningApps()
+        refreshRunningApps(using: snapshot)
     }
 
     // MARK: - Auto-Quit Confirmation & Execution
@@ -1643,14 +1429,11 @@ public final class AutoHideManager {
     // MARK: - Whitelist & Running Apps Management
 
     public func isAppWhitelisted(_ app: NSRunningApplication) -> Bool {
-        let whitelistSet = Set(whitelistedBundleIDs.map { $0.lowercased() })
-        if let bundleID = app.bundleIdentifier?.lowercased(), whitelistSet.contains(bundleID) {
-            return true
-        }
-        if let name = app.localizedName?.lowercased(), whitelistSet.contains(name) {
-            return true
-        }
-        return false
+        isExcluded(bundleIdentifier: app.bundleIdentifier, localizedName: app.localizedName)
+    }
+
+    func isExcluded(bundleIdentifier: String?, localizedName: String?) -> Bool {
+        exclusionIndex.contains(bundleIdentifier: bundleIdentifier, localizedName: localizedName)
     }
 
     public func addWhitelistEntry(_ identifier: String) {
@@ -1683,14 +1466,28 @@ public final class AutoHideManager {
         refreshRunningApps()
     }
 
+    public func requestRunningAppsRefresh() {
+        runtimeMetrics.refreshRequests += 1
+        refreshCoordinator.request { [weak self] in self?.refreshRunningApps() }
+    }
+
     public func refreshRunningApps() {
-        let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        refreshCoordinator.cancel()
+        let snapshot = appMonitor.capture(protectMedia: protectActiveMediaApps, forceFresh: false)
+        refreshRunningApps(using: snapshot)
+    }
+
+    private func refreshRunningApps(using snapshot: AppMonitor.Snapshot) {
+        refreshCoordinator.cancel()
+        runtimeMetrics.appScans += 1
+        runtimeMetrics.powerAssertionQueries = appMonitor.assertionQueryCount
+        let frontmostPID = snapshot.frontmostPID
         let myBundleID = Bundle.main.bundleIdentifier
         let now = sleepBeganDate ?? Date.now
         let currentUptime = ProcessInfo.processInfo.systemUptime
-        let assertionPIDs = protectActiveMediaApps ? activePowerAssertionPIDs() : []
+        let assertionPIDs = snapshot.protectedPIDs
 
-        let apps: [RunningAppInfo] = NSWorkspace.shared.runningApplications.compactMap { app in
+        let apps: [RunningAppInfo] = snapshot.applications.compactMap { app in
             guard app.activationPolicy == .regular,
                   !app.isTerminated,
                   let bundleID = app.bundleIdentifier,
@@ -1707,19 +1504,7 @@ public final class AutoHideManager {
                 let upElapsed = lastDeactivatedUptimes[pid].map { currentUptime - $0 } ?? wallElapsed
                 elapsed = max(0, min(wallElapsed, upElapsed))
             }
-            var icon = iconCache[bundleID]
-            if icon == nil {
-                if let bundleURL = app.bundleURL {
-                    let highResIcon = NSWorkspace.shared.icon(forFile: bundleURL.path)
-                    highResIcon.size = NSSize(width: 64, height: 64)
-                    iconCache[bundleID] = highResIcon
-                    icon = highResIcon
-                } else if let appIcon = app.icon {
-                    appIcon.size = NSSize(width: 64, height: 64)
-                    iconCache[bundleID] = appIcon
-                    icon = appIcon
-                }
-            }
+            let icon = appMonitor.icon(for: app, bundleID: bundleID)
 
             let whitelisted = isAppWhitelisted(app)
 
@@ -1884,7 +1669,10 @@ public final class AutoHideManager {
 
     isolated deinit {
         stopEvaluationTimer()
+        refreshCoordinator.cancel()
+        logWriter.finish()
         accessibilityPollTimer?.invalidate()
+        for observer in applicationObservers { NotificationCenter.default.removeObserver(observer) }
         let nc = NSWorkspace.shared.notificationCenter
         for observer in workspaceObservers {
             nc.removeObserver(observer)

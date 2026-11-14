@@ -6,10 +6,11 @@ import Testing
 @MainActor
 final class AutoHideAgentTests {
     private let suiteName = "AutoHideAgentTests.\(UUID().uuidString)"
+    private let logDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     private lazy var defaults = UserDefaults(suiteName: suiteName)!
 
     private func makeManager() -> AutoHideManager {
-        AutoHideManager(defaults: defaults, monitoringEnabled: false, dryRun: true)
+        AutoHideManager(defaults: defaults, monitoringEnabled: false, dryRun: true, logDirectory: logDirectory)
     }
 
     isolated deinit {
@@ -183,9 +184,10 @@ final class AutoHideAgentTests {
     }
 
     @Test("Persistent diagnostic log file is created and written on disk")
-    func testPersistentDiagnosticLogFile() {
+    func testPersistentDiagnosticLogFile() async {
         let manager = makeManager()
         manager.appendLog(.info, "Unit test diagnostic check.", technical: "suite=AutoHideAgentTests")
+        await manager.flushDiagnosticLog()
         let logURL = manager.logFileURL
         #expect(FileManager.default.fileExists(atPath: logURL.path))
     }
@@ -276,4 +278,61 @@ final class AutoHideAgentTests {
         #expect(!reloaded.alertOnAppQuit)
         #expect(reloaded.currentPausePreset == .twelveHours)
     }
+    @Test("Expired snooze clears even when both automation features are off")
+    func testPauseExpiryWithAutomationOff() async throws {
+        let manager = makeManager()
+        manager.isAutoHideEnabled = false
+        manager.isAutoQuitEnabled = false
+        manager.pause(for: 0.001)
+        try await Task.sleep(for: .milliseconds(20))
+        manager.evaluateAndHideInactiveApps()
+        #expect(manager.pausedUntilDate == nil)
+        #expect(manager.activityLogs.first?.userFriendlyMessage.contains("Resumed AutoHideAgent") == true)
+    }
+
+    @Test("An unavailable updater cannot claim automatic checks are enabled")
+    func testUnavailableUpdaterSettings() {
+        let updater = UpdateController.shared
+        #expect(!updater.isUpdaterAvailable)
+        #expect(!updater.canCheckForUpdates)
+        updater.automaticallyChecksForUpdates = true
+        #expect(!updater.automaticallyChecksForUpdates)
+        updater.checkForUpdates()
+    }
+
+    @Test("Menu icon selection follows the panel and focused desktop independently")
+    func testMenuBarSelectionAcrossPresentations() {
+        var state = MenuBarPresentationState()
+        #expect(!state.shouldHighlight(panelIsVisible: false, dashboardIsFocused: false))
+        #expect(state.shouldHighlight(panelIsVisible: false, dashboardIsFocused: true))
+        state.openPanel()
+        #expect(state.shouldHighlight(panelIsVisible: true, dashboardIsFocused: false))
+        #expect(!state.shouldHighlight(panelIsVisible: false, dashboardIsFocused: false))
+        let close = state.beginClosingPanel()
+        // A closing panel remains visible during its fade, but is no longer selected.
+        #expect(!state.shouldHighlight(panelIsVisible: true, dashboardIsFocused: false))
+        #expect(state.shouldHighlight(panelIsVisible: true, dashboardIsFocused: true))
+        let didClose = state.finishClosingPanel(transitionID: close)
+        #expect(didClose)
+        #expect(state.shouldHighlight(panelIsVisible: false, dashboardIsFocused: true))
+        #expect(!state.shouldHighlight(panelIsVisible: false, dashboardIsFocused: false))
+    }
+
+    @Test("A stale close animation cannot dismiss a reopened menu panel")
+    func testMenuPanelReopenDuringClose() {
+        var state = MenuBarPresentationState()
+        state.openPanel()
+        let oldClose = state.beginClosingPanel()
+        state.openPanel()
+        let staleCloseAccepted = state.finishClosingPanel(transitionID: oldClose)
+        #expect(!staleCloseAccepted)
+        #expect(state.shouldHighlight(panelIsVisible: true, dashboardIsFocused: false))
+        let currentClose = state.beginClosingPanel()
+        let secondStaleCloseAccepted = state.finishClosingPanel(transitionID: oldClose)
+        #expect(!secondStaleCloseAccepted)
+        let currentCloseAccepted = state.finishClosingPanel(transitionID: currentClose)
+        #expect(currentCloseAccepted)
+        #expect(!state.shouldHighlight(panelIsVisible: false, dashboardIsFocused: false))
+    }
+
 }

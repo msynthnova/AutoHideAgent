@@ -130,3 +130,10 @@ Use this when changes are tested, polished, and ready for public download and Ho
 - Unit tests, Developer ID signing, Apple notarization, Gatekeeper, Sparkle archive
   and delta signatures, and an isolated development launch smoke test were verified
   for v1.4.7, Build 14. Full live hide/quit behavior was not exercised on user apps.
+
+## Performance improvements in v1.4.8
+
+The current performance suite has 32 Swift tests and four Python metric checks.
+See `PERFORMANCE.md` for component ownership, safety constraints, reproducible
+optimized development builds, and process CPU/RSS/footprint regression budgets.
+The release includes the menu-highlight synchronization and dashboard fixes.

@@ -2,6 +2,8 @@ import Foundation
 
 /// Bundle identity, rather than its filesystem location, determines the environment.
 enum AppRuntime {
+    static let dashboardWindowIdentifier = "AutoHideAgent.dashboard"
+
     static var isDevelopment: Bool {
         isDevelopment(bundleIdentifier: Bundle.main.bundleIdentifier)
     }

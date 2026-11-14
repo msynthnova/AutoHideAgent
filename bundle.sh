@@ -11,6 +11,15 @@ if [[ "$MODE" != "debug" && "$MODE" != "release" ]]; then
     echo "ERROR: Expected debug or release configuration." >&2
     exit 1
 fi
+BUILD_CONFIGURATION="${AUTOHIDE_BUILD_CONFIGURATION:-$MODE}"
+if [[ "$BUILD_CONFIGURATION" != "debug" && "$BUILD_CONFIGURATION" != "release" ]]; then
+    echo "ERROR: Invalid Swift build configuration." >&2
+    exit 1
+fi
+if [[ "$MODE" == "release" && "$BUILD_CONFIGURATION" != "release" ]]; then
+    echo "ERROR: Release packaging requires an optimized release build." >&2
+    exit 1
+fi
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Ensure SDKROOT points to a valid directory to prevent xcrun/swift failures
@@ -41,9 +50,9 @@ APP_VERSION="${2:-$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionStrin
 NOTARY_PROFILE="${NOTARY_PROFILE:-notarytool-profile}"
 
 echo "==> Building AutoHideAgent (Swift 6, configuration: $MODE, version: $APP_VERSION)..."
-swift build --package-path "$PROJECT_DIR" -c "$MODE"
+swift build --package-path "$PROJECT_DIR" -c "$BUILD_CONFIGURATION"
 
-BIN_PATH=$(swift build --package-path "$PROJECT_DIR" -c "$MODE" --show-bin-path)
+BIN_PATH=$(swift build --package-path "$PROJECT_DIR" -c "$BUILD_CONFIGURATION" --show-bin-path)
 EXECUTABLE="$BIN_PATH/AutoHideAgent"
 
 echo "==> Stopping any local build instance of AutoHideAgent ($APP_BUNDLE)..."
